@@ -227,6 +227,13 @@
   .inline-cost{width:92px;padding:6px 8px;font-size:12.5px;}
   .inline-cost.over{border-color:var(--clay);color:var(--clay);font-weight:600;}
   .inline-cost.under{border-color:var(--teal);color:var(--teal);font-weight:600;}
+  .payer-pill{font-family:'Inter',sans-serif;font-size:11px;font-weight:700;padding:6px 9px;border-radius:20px;
+    border:1px dashed var(--line);background:var(--paper);color:var(--text-soft);cursor:pointer;flex:none;
+    transition:background .1s ease,border-color .1s ease,color .1s ease;}
+  .payer-pill:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
+  .payer-pill.is-set{border-style:solid;border-color:var(--amber-deep);background:var(--amber);color:var(--ink);}
+  .cost-with-payer{display:flex;align-items:center;gap:6px;}
+  .cost-with-payer input{flex:1;min-width:0;}
   .photo-thumb-sm{width:32px;height:32px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line);}
   .photo-add-sm{width:32px;height:32px;border-radius:6px;border:1.5px dashed var(--line);display:flex;align-items:center;
     justify-content:center;cursor:pointer;color:var(--text-soft);font-size:16px;background:var(--paper);flex:none;}
@@ -580,9 +587,9 @@ const App = (function(){
       notes: data.notes, totalEst:0, totalAct:0, createdAt: Date.now() };
     state.trips.unshift(trip);
     const items = data.items.map(it => ({ id: uid(), day: it.day, time: it.time, name: it.name,
-      notes: it.notes, estCost: it.estCost, actualCost: 0, images: [], candidates: [] }));
+      notes: it.notes, estCost: it.estCost, actualCost: 0, payer: '', images: [], candidates: [] }));
     const expenses = data.expenses.map(ex => ({ id: uid(), category: ex.category, description: ex.description,
-      estCost: ex.estCost, actualCost: ex.actualCost, image: null }));
+      estCost: ex.estCost, actualCost: ex.actualCost, payer: '', image: null }));
     state.items[trip.id] = items;
     state.expenses[trip.id] = expenses;
     state.covers[trip.id] = [];
@@ -663,13 +670,13 @@ const App = (function(){
     const id = state.currentTripId;
     const items = state.items[id];
     const maxDay = items.reduce((m,i)=>Math.max(m,i.day),0);
-    items.push({ id: uid(), day: maxDay+1, time:'', name:'新景點', notes:'', estCost:0, actualCost:0, images:[], candidates:[] });
+    items.push({ id: uid(), day: maxDay+1, time:'', name:'新景點', notes:'', estCost:0, actualCost:0, payer:'', images:[], candidates:[] });
     save('trip-items-'+id, items); recomputeTotals(id); render();
   }
   function addStop(day){
     const id = state.currentTripId;
     const items = state.items[id];
-    items.push({ id: uid(), day, time:'', name:'新景點', notes:'', estCost:0, actualCost:0, images:[], candidates:[] });
+    items.push({ id: uid(), day, time:'', name:'新景點', notes:'', estCost:0, actualCost:0, payer:'', images:[], candidates:[] });
     save('trip-items-'+id, items); recomputeTotals(id); render();
   }
   function updateItemField(itemId, field, value){
@@ -680,6 +687,16 @@ const App = (function(){
     item[field] = value;
     save('trip-items-'+id, state.items[id]);
     if(field==='estCost' || field==='actualCost') recomputeTotals(id);
+  }
+  const PAYER_CYCLE = ['', '蒨', '浚'];
+  function cycleStopPayer(itemId){
+    const id = state.currentTripId;
+    const item = state.items[id].find(i=>i.id===itemId);
+    if(!item) return;
+    const cur = PAYER_CYCLE.indexOf(item.payer||'');
+    item.payer = PAYER_CYCLE[(cur+1) % PAYER_CYCLE.length];
+    save('trip-items-'+id, state.items[id]);
+    render();
   }
   async function deleteStop(itemId){
     if(!confirm('刪除這個景點？')) return;
@@ -742,7 +759,7 @@ const App = (function(){
   // ---------- Expenses ----------
   function addExpense(){
     const id = state.currentTripId;
-    state.expenses[id].push({ id: uid(), category:'其他', description:'', estCost:0, actualCost:0, image:null });
+    state.expenses[id].push({ id: uid(), category:'其他', description:'', estCost:0, actualCost:0, payer:'', image:null });
     save('trip-expenses-'+id, state.expenses[id]); recomputeTotals(id); render();
   }
   function updateExpenseField(expId, field, value){
@@ -753,6 +770,15 @@ const App = (function(){
     ex[field] = value;
     save('trip-expenses-'+id, state.expenses[id]);
     if(field==='estCost' || field==='actualCost') recomputeTotals(id);
+  }
+  function cycleExpensePayer(expId){
+    const id = state.currentTripId;
+    const ex = state.expenses[id].find(e=>e.id===expId);
+    if(!ex) return;
+    const cur = PAYER_CYCLE.indexOf(ex.payer||'');
+    ex.payer = PAYER_CYCLE[(cur+1) % PAYER_CYCLE.length];
+    save('trip-expenses-'+id, state.expenses[id]);
+    render();
   }
   async function deleteExpense(expId){
     if(!confirm('刪除這筆開銷？')) return;
@@ -958,6 +984,7 @@ const App = (function(){
           '</div>'+
           '<div class="stop-inline-actions">'+
             '<span class="inline-est mono" title="預估花費">預估 $'+fmt(item.estCost)+'</span>'+
+            '<button type="button" class="payer-pill'+(item.payer?' is-set':'')+'" title="點一下切換付款者" onclick="event.stopPropagation();App.cycleStopPayer(\''+item.id+'\')">'+(item.payer||'付款者')+'</button>'+
             '<input type="number" class="inline-cost mono '+(item.actualCost>item.estCost && item.estCost>0?'over':(item.actualCost>0?'under':''))+'" value="'+item.actualCost+'" placeholder="實際花費" onchange="App.updateItemField(\''+item.id+'\',\'actualCost\',this.value)">'+
             item.images.map((src,i)=>'<img class="photo-thumb-sm" src="'+src+'" onclick="App.openLightboxWithDelete(\'stop\',\''+item.id+'\','+i+')">').join('')+
             '<label class="photo-add-sm">＋<input type="file" accept="image/*" multiple style="display:none" onchange="App.handleStopImageUpload(event,\''+item.id+'\')"></label>'+
@@ -980,12 +1007,16 @@ const App = (function(){
     const costsHtml = editing ?
       '<div class="stop-costs">'+
         '<div class="field"><label>預估花費</label><input type="number" value="'+item.estCost+'" onchange="App.updateItemField(\''+item.id+'\',\'estCost\',this.value)"></div>'+
-        '<div class="field"><label>實際花費</label><input type="number" value="'+item.actualCost+'" onchange="App.updateItemField(\''+item.id+'\',\'actualCost\',this.value)"></div>'+
+        '<div class="field"><label>實際花費</label><div class="cost-with-payer">'+
+          '<button type="button" class="payer-pill'+(item.payer?' is-set':'')+'" title="點一下切換付款者" onclick="App.cycleStopPayer(\''+item.id+'\')">'+(item.payer||'付款者')+'</button>'+
+          '<input type="number" value="'+item.actualCost+'" onchange="App.updateItemField(\''+item.id+'\',\'actualCost\',this.value)"></div></div>'+
       '</div>'
       :
       '<div class="stop-costs">'+
         '<div class="field"><label>預估花費</label><div class="static-val mono">$'+fmt(item.estCost)+'</div></div>'+
-        '<div class="field"><label>實際花費</label><input type="number" value="'+item.actualCost+'" onchange="App.updateItemField(\''+item.id+'\',\'actualCost\',this.value)"></div>'+
+        '<div class="field"><label>實際花費</label><div class="cost-with-payer">'+
+          '<button type="button" class="payer-pill'+(item.payer?' is-set':'')+'" title="點一下切換付款者" onclick="App.cycleStopPayer(\''+item.id+'\')">'+(item.payer||'付款者')+'</button>'+
+          '<input type="number" value="'+item.actualCost+'" onchange="App.updateItemField(\''+item.id+'\',\'actualCost\',this.value)"></div></div>'+
       '</div>';
 
     const notesHtml = editing ?
@@ -1030,6 +1061,7 @@ const App = (function(){
           '</div>'+
           '<div class="stop-inline-actions">'+
             '<span class="inline-est mono" title="預估花費">預估 $'+fmt(ex.estCost)+'</span>'+
+            '<button type="button" class="payer-pill'+(ex.payer?' is-set':'')+'" title="點一下切換付款者" onclick="event.stopPropagation();App.cycleExpensePayer(\''+ex.id+'\')">'+(ex.payer||'付款者')+'</button>'+
             '<input type="number" class="inline-cost mono '+(ex.actualCost>ex.estCost && ex.estCost>0?'over':(ex.actualCost>0?'under':''))+'" value="'+ex.actualCost+'" placeholder="實際花費" onchange="App.updateExpenseField(\''+ex.id+'\',\'actualCost\',this.value)">'+
             (ex.image ? '<img class="photo-thumb-sm" src="'+ex.image+'" onclick="App.openLightboxWithDelete(\'expense\',\''+ex.id+'\')">' :
               '<label class="photo-add-sm">＋<input type="file" accept="image/*" style="display:none" onchange="App.handleExpenseImageUpload(event,\''+ex.id+'\')"></label>')+
@@ -1052,12 +1084,16 @@ const App = (function(){
     const costsHtml = editing ?
       '<div class="expense-costs">'+
         '<div class="field"><label>預估</label><input type="number" value="'+ex.estCost+'" onchange="App.updateExpenseField(\''+ex.id+'\',\'estCost\',this.value)"></div>'+
-        '<div class="field"><label>實際</label><input type="number" value="'+ex.actualCost+'" onchange="App.updateExpenseField(\''+ex.id+'\',\'actualCost\',this.value)"></div>'+
+        '<div class="field"><label>實際</label><div class="cost-with-payer">'+
+          '<button type="button" class="payer-pill'+(ex.payer?' is-set':'')+'" title="點一下切換付款者" onclick="App.cycleExpensePayer(\''+ex.id+'\')">'+(ex.payer||'付款者')+'</button>'+
+          '<input type="number" value="'+ex.actualCost+'" onchange="App.updateExpenseField(\''+ex.id+'\',\'actualCost\',this.value)"></div></div>'+
       '</div>'
       :
       '<div class="expense-costs">'+
         '<div class="field"><label>預估</label><div class="static-val mono">$'+fmt(ex.estCost)+'</div></div>'+
-        '<div class="field"><label>實際</label><input type="number" value="'+ex.actualCost+'" onchange="App.updateExpenseField(\''+ex.id+'\',\'actualCost\',this.value)"></div>'+
+        '<div class="field"><label>實際</label><div class="cost-with-payer">'+
+          '<button type="button" class="payer-pill'+(ex.payer?' is-set':'')+'" title="點一下切換付款者" onclick="App.cycleExpensePayer(\''+ex.id+'\')">'+(ex.payer||'付款者')+'</button>'+
+          '<input type="number" value="'+ex.actualCost+'" onchange="App.updateExpenseField(\''+ex.id+'\',\'actualCost\',this.value)"></div></div>'+
       '</div>';
 
     return '<div class="expense-row">'+
@@ -1130,8 +1166,8 @@ const App = (function(){
     handleCoverUpload, deleteCoverImage,
     toggleDay, setAllDaysCollapsed, toggleEditMode, toggleStop, toggleExpense,
     addDay, addStop, updateItemField, deleteStop, handleStopImageUpload, deleteStopImage,
-    addCandidate, updateCandidateField, deleteCandidate,
-    addExpense, updateExpenseField, deleteExpense, handleExpenseImageUpload, deleteExpenseImage,
+    addCandidate, updateCandidateField, deleteCandidate, cycleStopPayer,
+    addExpense, updateExpenseField, deleteExpense, handleExpenseImageUpload, deleteExpenseImage, cycleExpensePayer,
     closeLightbox, openLightboxWithDelete, confirmDeleteLightbox
   };
 })();
