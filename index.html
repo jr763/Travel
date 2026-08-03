@@ -211,6 +211,7 @@
 
   .expense-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:16px 18px;margin-bottom:10px;
     border:1px solid transparent;transition:border-color .12s ease;}
+  .expense-row.is-compact{padding:9px 14px;}
   .expense-row:hover{border-color:var(--line);}
   .expense-top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
   .expense-top select{width:108px;}
@@ -259,7 +260,7 @@
 
 <script>
 const App = (function(){
-  const state = { trips: [], covers: {}, items: {}, expenses: {}, currentTripId: null, modal: null, importFile: null, dayCollapse: {}, editMode: {}, stopCollapse: {} };
+  const state = { trips: [], covers: {}, items: {}, expenses: {}, currentTripId: null, modal: null, importFile: null, dayCollapse: {}, editMode: {}, stopCollapse: {}, expenseCollapse: {} };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
@@ -541,6 +542,20 @@ const App = (function(){
     const id = state.currentTripId;
     if(!state.stopCollapse[id]) state.stopCollapse[id] = {};
     state.stopCollapse[id][itemId] = !isStopCollapsed(itemId);
+    render();
+  }
+
+  // ---------- Expense collapse (each entry defaults to a compact row) ----------
+  function isExpenseCollapsed(expId){
+    const id = state.currentTripId;
+    const map = state.expenseCollapse[id];
+    if(!map || map[expId] === undefined) return true; // compact by default
+    return !!map[expId];
+  }
+  function toggleExpense(expId){
+    const id = state.currentTripId;
+    if(!state.expenseCollapse[id]) state.expenseCollapse[id] = {};
+    state.expenseCollapse[id][expId] = !isExpenseCollapsed(expId);
     render();
   }
 
@@ -900,6 +915,27 @@ const App = (function(){
 
   function renderExpense(ex, editing){
     const cats = ['交通','住宿','餐飲','門票','購物','其他'];
+    const collapsed = !editing && isExpenseCollapsed(ex.id);
+
+    // Compact row: category pill + description, actual cost vs estimate inline, receipt thumbnail inline.
+    if(collapsed){
+      return '<div class="expense-row is-compact">'+
+        '<div class="stop-compact-row">'+
+          '<div class="stop-compact-label" onclick="App.toggleExpense(\''+ex.id+'\')">'+
+            '<span class="chevron-sm">▸</span>'+
+            '<span class="tag-pill">'+esc(ex.category)+'</span>'+
+            '<span class="stop-name-compact">'+esc(ex.description||'（未填寫說明）')+'</span>'+
+          '</div>'+
+          '<div class="stop-inline-actions">'+
+            '<span class="inline-est mono" title="預估花費">預估 $'+fmt(ex.estCost)+'</span>'+
+            '<input type="number" class="inline-cost mono '+(ex.actualCost>ex.estCost && ex.estCost>0?'over':(ex.actualCost>0?'under':''))+'" value="'+ex.actualCost+'" placeholder="實際花費" onchange="App.updateExpenseField(\''+ex.id+'\',\'actualCost\',this.value)">'+
+            (ex.image ? '<img class="photo-thumb-sm" src="'+ex.image+'" onclick="App.openLightboxWithDelete(\'expense\',\''+ex.id+'\')">' :
+              '<label class="photo-add-sm">＋<input type="file" accept="image/*" style="display:none" onchange="App.handleExpenseImageUpload(event,\''+ex.id+'\')"></label>')+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }
+
     const topHtml = editing ?
       '<select onchange="App.updateExpenseField(\''+ex.id+'\',\'category\',this.value)">'+
         cats.map(c=>'<option '+(c===ex.category?'selected':'')+'>'+c+'</option>').join('')+
@@ -907,7 +943,9 @@ const App = (function(){
       '<input type="text" class="desc" placeholder="說明" value="'+esc(ex.description)+'" onchange="App.updateExpenseField(\''+ex.id+'\',\'description\',this.value)">'+
       '<button class="icon-btn" title="刪除" onclick="App.deleteExpense(\''+ex.id+'\')">✕</button>'
       :
-      '<div class="stop-static-title"><span class="tag-pill">'+esc(ex.category)+'</span> '+esc(ex.description||'（未填寫說明）')+'</div>';
+      '<div class="stop-static-title" onclick="App.toggleExpense(\''+ex.id+'\')" style="cursor:pointer;">'+
+        '<span class="chevron-sm">▾</span> <span class="tag-pill">'+esc(ex.category)+'</span> '+esc(ex.description||'（未填寫說明）')+
+      '</div>';
 
     const costsHtml = editing ?
       '<div class="expense-costs">'+
@@ -974,7 +1012,7 @@ const App = (function(){
     openEditTripModal, submitEditTrip, deleteTrip,
     downloadTemplate, handleImportFileChange, submitImportExcel,
     handleCoverUpload, deleteCoverImage,
-    toggleDay, setAllDaysCollapsed, toggleEditMode, toggleStop,
+    toggleDay, setAllDaysCollapsed, toggleEditMode, toggleStop, toggleExpense,
     addDay, addStop, updateItemField, deleteStop, handleStopImageUpload, deleteStopImage,
     addCandidate, updateCandidateField, deleteCandidate,
     addExpense, updateExpenseField, deleteExpense, handleExpenseImageUpload, deleteExpenseImage,
