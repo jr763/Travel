@@ -175,7 +175,8 @@
   .stop-compact-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
   .stop-compact-label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;flex:1;}
   .chevron-sm{color:var(--text-soft);font-size:11px;flex:none;}
-  .stop-name-compact{font-weight:600;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .stop-name-compact{font-weight:600;font-size:14px;color:var(--ink);flex:none;white-space:nowrap;}
+  .stop-note-inline{font-size:12.5px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;}
   .stop-inline-actions{display:flex;align-items:center;gap:6px;flex:none;}
   .inline-est{font-size:11.5px;color:var(--text-soft);white-space:nowrap;flex:none;}
   .inline-cost{width:92px;padding:6px 8px;font-size:12.5px;}
@@ -853,6 +854,7 @@ const App = (function(){
           '<div class="stop-compact-label" onclick="App.toggleStop(\''+item.id+'\')">'+
             '<span class="chevron-sm">▸</span>'+
             '<span class="stop-name-compact">'+(item.time?'<span class="mono">'+esc(item.time)+'</span> · ':'')+esc(item.name||'未命名景點')+'</span>'+
+            (item.notes ? '<span class="stop-note-inline">'+esc(item.notes)+'</span>' : '')+
           '</div>'+
           '<div class="stop-inline-actions">'+
             '<span class="inline-est mono" title="預估花費">預估 $'+fmt(item.estCost)+'</span>'+
