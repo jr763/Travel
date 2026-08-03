@@ -171,6 +171,20 @@
   .stop-card{background:var(--paper-tint);border-radius:var(--radius-md);padding:16px 18px;margin-bottom:10px;
     border:1px solid transparent;transition:border-color .12s ease;}
   .stop-card:hover{border-color:var(--line);}
+  .stop-card.is-compact{padding:9px 14px;}
+  .stop-compact-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .stop-compact-label{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;flex:1;}
+  .chevron-sm{color:var(--text-soft);font-size:11px;flex:none;}
+  .stop-name-compact{font-weight:600;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .stop-inline-actions{display:flex;align-items:center;gap:6px;flex:none;}
+  .inline-est{font-size:11.5px;color:var(--text-soft);white-space:nowrap;flex:none;}
+  .inline-cost{width:92px;padding:6px 8px;font-size:12.5px;}
+  .inline-cost.over{border-color:var(--clay);color:var(--clay);font-weight:600;}
+  .inline-cost.under{border-color:var(--teal);color:var(--teal);font-weight:600;}
+  .photo-thumb-sm{width:32px;height:32px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line);}
+  .photo-add-sm{width:32px;height:32px;border-radius:6px;border:1.5px dashed var(--line);display:flex;align-items:center;
+    justify-content:center;cursor:pointer;color:var(--text-soft);font-size:16px;background:var(--paper);flex:none;}
+  .photo-add-sm:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
   .stop-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
   .stop-top input[type=time]{width:104px;}
   .stop-top input.name{flex:1;min-width:140px;font-weight:600;font-family:'Inter',sans-serif;font-size:15px;}
@@ -245,7 +259,7 @@
 
 <script>
 const App = (function(){
-  const state = { trips: [], covers: {}, items: {}, expenses: {}, currentTripId: null, modal: null, importFile: null, dayCollapse: {}, editMode: {} };
+  const state = { trips: [], covers: {}, items: {}, expenses: {}, currentTripId: null, modal: null, importFile: null, dayCollapse: {}, editMode: {}, stopCollapse: {} };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
@@ -513,6 +527,20 @@ const App = (function(){
     const map = {};
     items.forEach(i => { map[i.day] = collapsed; });
     state.dayCollapse[id] = map;
+    render();
+  }
+
+  // ---------- Stop collapse (each attraction defaults to a compact row) ----------
+  function isStopCollapsed(itemId){
+    const id = state.currentTripId;
+    const map = state.stopCollapse[id];
+    if(!map || map[itemId] === undefined) return true; // compact by default
+    return !!map[itemId];
+  }
+  function toggleStop(itemId){
+    const id = state.currentTripId;
+    if(!state.stopCollapse[id]) state.stopCollapse[id] = {};
+    state.stopCollapse[id][itemId] = !isStopCollapsed(itemId);
     render();
   }
 
@@ -801,13 +829,36 @@ const App = (function(){
   }
 
   function renderStop(item, editing){
+    const collapsed = !editing && isStopCollapsed(item.id);
+
+    // Compact row: shown whenever not editing and not expanded — name, actual cost, photos, all inline.
+    if(collapsed){
+      return '<div class="stop-card is-compact">'+
+        '<div class="stop-compact-row">'+
+          '<div class="stop-compact-label" onclick="App.toggleStop(\''+item.id+'\')">'+
+            '<span class="chevron-sm">▸</span>'+
+            '<span class="stop-name-compact">'+(item.time?'<span class="mono">'+esc(item.time)+'</span> · ':'')+esc(item.name||'未命名景點')+'</span>'+
+          '</div>'+
+          '<div class="stop-inline-actions">'+
+            '<span class="inline-est mono" title="預估花費">預估 $'+fmt(item.estCost)+'</span>'+
+            '<input type="number" class="inline-cost mono '+(item.actualCost>item.estCost && item.estCost>0?'over':(item.actualCost>0?'under':''))+'" value="'+item.actualCost+'" placeholder="實際花費" onchange="App.updateItemField(\''+item.id+'\',\'actualCost\',this.value)">'+
+            item.images.map((src,i)=>'<img class="photo-thumb-sm" src="'+src+'" onclick="App.openLightboxWithDelete(\'stop\',\''+item.id+'\','+i+')">').join('')+
+            '<label class="photo-add-sm">＋<input type="file" accept="image/*" multiple style="display:none" onchange="App.handleStopImageUpload(event,\''+item.id+'\')"></label>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }
+
     const candidates = item.candidates || [];
     const topHtml = editing ?
       '<input type="time" value="'+esc(item.time)+'" onchange="App.updateItemField(\''+item.id+'\',\'time\',this.value)">'+
       '<input type="text" class="name" value="'+esc(item.name)+'" onchange="App.updateItemField(\''+item.id+'\',\'name\',this.value)" placeholder="景點名稱">'+
       '<button class="icon-btn" title="刪除景點" onclick="App.deleteStop(\''+item.id+'\')">✕</button>'
       :
-      '<div class="stop-static-title">'+(item.time?'<span class="mono">'+esc(item.time)+'</span> · ':'')+esc(item.name||'未命名景點')+'</div>';
+      '<div class="stop-static-title" onclick="App.toggleStop(\''+item.id+'\')" style="cursor:pointer;">'+
+        '<span class="chevron-sm">▾</span> '+
+        (item.time?'<span class="mono">'+esc(item.time)+'</span> · ':'')+esc(item.name||'未命名景點')+
+      '</div>';
 
     const costsHtml = editing ?
       '<div class="stop-costs">'+
@@ -923,7 +974,7 @@ const App = (function(){
     openEditTripModal, submitEditTrip, deleteTrip,
     downloadTemplate, handleImportFileChange, submitImportExcel,
     handleCoverUpload, deleteCoverImage,
-    toggleDay, setAllDaysCollapsed, toggleEditMode,
+    toggleDay, setAllDaysCollapsed, toggleEditMode, toggleStop,
     addDay, addStop, updateItemField, deleteStop, handleStopImageUpload, deleteStopImage,
     addCandidate, updateCandidateField, deleteCandidate,
     addExpense, updateExpenseField, deleteExpense, handleExpenseImageUpload, deleteExpenseImage,
