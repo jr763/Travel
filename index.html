@@ -5,50 +5,89 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>行旅誌</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Iansui&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module">
+  // ====================================================================
+  // 雲端同步設定（選填）：到 https://console.firebase.google.com 建立一個
+  // 免費專案、啟用 Firestore Database，再把「專案設定 → 你的應用程式」裡的
+  // firebaseConfig 貼到下面，取代整個物件內容即可啟用雲端同步。
+  // 沒有填的話，網站仍會正常運作，只是資料只存在這台裝置的瀏覽器裡。
+  // ====================================================================
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDMDncYJsa2wkToqQ6tc602_cv5fx04lz4",
+    authDomain: "travel-log-311ad.firebaseapp.com",
+    projectId: "travel-log-311ad",
+    storageBucket: "travel-log-311ad.firebasestorage.app",
+    messagingSenderId: "1056165929289",
+    appId: "1:1056165929289:web:1b86c72fc1c3fe72407a98"
+  };
+  // ====================================================================
+
+  window.__cloudReady = false;
+  if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY") {
+    try {
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const { getFirestore, doc, getDoc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      const app = initializeApp(FIREBASE_CONFIG);
+      const db = getFirestore(app);
+      window.fbSaveEntry = async function(code, key, valueStr){
+        await setDoc(doc(db, 'travel-log', code, 'entries', key), { value: valueStr, updatedAt: Date.now() });
+      };
+      window.fbLoadEntry = async function(code, key){
+        const snap = await getDoc(doc(db, 'travel-log', code, 'entries', key));
+        return snap.exists() ? snap.data().value : null;
+      };
+      window.__cloudReady = true;
+    } catch (e) {
+      console.error('Firebase 初始化失敗', e);
+    }
+  }
+</script>
 <style>
   :root{
-    --ink:#132A3E;
-    --ink-soft:#284258;
-    --bg-page:#F6F2E7;
-    --paper:#FFFFFF;
-    --paper-tint:#F1ECDD;
-    --amber:#E2A33E;
-    --amber-deep:#C4841F;
-    --clay:#B85C3E;
-    --teal:#256B63;
-    --line:#E4DCC6;
-    --line-soft:#EEE8D6;
-    --text:#20242B;
-    --text-soft:#767061;
-    --radius-lg:18px;
-    --radius-md:12px;
-    --radius-sm:8px;
-    --shadow-card:0 1px 2px rgba(19,42,62,.06), 0 10px 28px -12px rgba(19,42,62,.18);
-    --shadow-hover:0 1px 2px rgba(19,42,62,.08), 0 16px 36px -12px rgba(19,42,62,.26);
+    --ink:#3A3229;
+    --ink-soft:#6B6255;
+    --bg-page:#F3EADA;
+    --paper:#FFFBF3;
+    --paper-tint:#EFE4CE;
+    --amber:#E8B84B;
+    --amber-deep:#C99A2E;
+    --clay:#D98A93;
+    --teal:#8FA888;
+    --sky:#9DBAD1;
+    --line:#E1D3B6;
+    --line-soft:#EBE1CA;
+    --text:#3D3327;
+    --text-soft:#93876E;
+    --radius-lg:9px;
+    --radius-md:6px;
+    --radius-sm:4px;
+    --shadow-card:0 1px 2px rgba(58,50,41,.07), 0 8px 18px -10px rgba(58,50,41,.22);
+    --shadow-hover:0 1px 2px rgba(58,50,41,.09), 0 14px 26px -10px rgba(58,50,41,.28);
   }
   *{box-sizing:border-box;}
   html{scroll-behavior:smooth;}
   body{margin:0;background:var(--bg-page);color:var(--text);font-family:'Inter',sans-serif;line-height:1.45;
-    background-image:radial-gradient(circle at 1px 1px, rgba(19,42,62,.06) 1px, transparent 0);
-    background-size:24px 24px;}
+    background-image:radial-gradient(circle at 1px 1px, rgba(58,50,41,.16) 1px, transparent 0);
+    background-size:18px 18px;}
   .mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
-  .disp{font-family:'Fraunces',serif;font-weight:600;}
+  .disp{font-family:'Iansui',cursive;font-weight:400;}
 
   input,select,textarea{font-family:'Inter',sans-serif;font-size:14px;padding:9px 11px;border:1px solid var(--line);
     border-radius:var(--radius-sm);background:var(--paper);color:var(--text);outline:none;transition:border-color .12s ease, box-shadow .12s ease;}
-  input:focus,select:focus,textarea:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(226,163,62,.18);}
+  input:focus,select:focus,textarea:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(201,154,46,.18);}
   input[type=number],input[type=time]{font-family:'IBM Plex Mono',monospace;}
   textarea{resize:vertical;}
 
-  #topbar{background:var(--ink);color:#F6F2E7;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;
-    box-shadow:0 4px 18px rgba(19,42,62,.22);position:sticky;top:0;z-index:20;}
+  #topbar{background:var(--ink);color:#FBF6EA;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 4px 18px rgba(58,50,41,.22);position:sticky;top:0;z-index:20;}
   #topbar .brand{display:flex;align-items:center;gap:11px;}
-  #topbar .brand .mark{width:30px;height:30px;border-radius:9px;background:var(--amber);color:var(--ink);display:flex;
-    align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:700;font-size:16px;flex:none;}
-  #topbar .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:0;letter-spacing:.01em;}
-  #topbar .brand .tag{color:rgba(246,242,231,.5);font-size:11.5px;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;display:block;margin-top:1px;}
+  #topbar .brand .mark{width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--amber);display:flex;
+    align-items:center;justify-content:center;border:2px solid var(--amber);transform:rotate(-6deg);
+    font-family:'Iansui',cursive;font-weight:400;font-size:16px;flex:none;}
+  #topbar .brand h1{font-family:'Iansui',cursive;font-weight:400;font-size:21px;margin:0;letter-spacing:.01em;}
+  #topbar .brand .tag{color:rgba(251,246,234,.5);font-size:11.5px;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;display:block;margin-top:1px;}
   #view{max-width:920px;margin:0 auto;padding:36px 22px 90px;}
 
   .btn{font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;border:none;border-radius:var(--radius-sm);
@@ -56,36 +95,39 @@
     display:inline-flex;align-items:center;gap:6px;}
   .btn:active{transform:scale(.96);}
   .btn-amber{background:var(--amber);color:var(--ink);box-shadow:0 2px 0 var(--amber-deep);}
-  .btn-amber:hover{background:#eab151;}
-  .btn-ghost{background:rgba(246,242,231,.08);color:#F6F2E7;border:1px solid rgba(246,242,231,.3);}
-  .btn-ghost:hover{background:rgba(246,242,231,.16);}
+  .btn-amber:hover{background:var(--amber-deep);color:#FBF6EA;}
+  .btn-ghost{background:rgba(251,246,234,.08);color:#FBF6EA;border:1px solid rgba(251,246,234,.3);}
+  .btn-ghost:hover{background:rgba(251,246,234,.16);}
   .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--line);}
   .btn-outline:hover{border-color:var(--ink);background:var(--paper-tint);}
   .btn-danger{background:transparent;color:var(--clay);border:1px solid transparent;}
-  .btn-danger:hover{background:rgba(184,92,62,.1);}
+  .btn-danger:hover{background:rgba(217,138,147,.1);}
   .btn-sm{padding:7px 12px;font-size:12.5px;border-radius:7px;}
   .actions-row{display:flex;gap:10px;flex-wrap:wrap;}
-  a.link{color:var(--teal);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(37,107,99,.35);}
+  a.link{color:var(--teal);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(143,168,136,.35);}
   a.link:hover{border-color:var(--teal);}
 
   /* Trip list */
   .list-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:26px;flex-wrap:wrap;gap:14px;}
-  .list-header h2{font-family:'Fraunces',serif;font-weight:600;font-size:30px;margin:0;color:var(--ink);}
+  .list-header h2{font-family:'Iansui',cursive;font-weight:400;font-size:30px;margin:0;color:var(--ink);}
   .list-header p{margin:5px 0 0;color:var(--text-soft);font-size:13px;}
   .empty{background:var(--paper);border:1.5px dashed var(--line);border-radius:var(--radius-lg);padding:56px 24px;text-align:center;color:var(--text-soft);}
   .empty .glyph{font-size:30px;margin-bottom:10px;}
-  .empty b{display:block;color:var(--ink);font-family:'Fraunces',serif;font-weight:600;font-size:19px;margin-bottom:6px;}
+  .empty b{display:block;color:var(--ink);font-family:'Iansui',cursive;font-weight:400;font-size:19px;margin-bottom:6px;}
   .trip-grid{display:grid;gap:14px;}
   .trip-card{display:flex;background:var(--paper);border-radius:var(--radius-lg);overflow:hidden;cursor:pointer;
-    box-shadow:var(--shadow-card);transition:box-shadow .15s ease, transform .15s ease;position:relative;}
-  .trip-card:hover{box-shadow:var(--shadow-hover);transform:translateY(-2px);}
-  .trip-card .stub{width:96px;flex:none;background:var(--ink);color:#F6F2E7;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;position:relative;padding:12px 6px;text-align:center;}
-  .trip-card .stub::after{content:'';position:absolute;right:-1px;top:10px;bottom:10px;width:0;border-right:2px dashed rgba(246,242,231,.25);}
-  .trip-card .stub .num{font-family:'Fraunces',serif;font-weight:700;font-size:27px;color:var(--amber);line-height:1;}
-  .trip-card .stub .lbl{font-size:9.5px;letter-spacing:.1em;color:rgba(246,242,231,.6);margin-top:5px;text-transform:uppercase;}
+    box-shadow:var(--shadow-card);transition:box-shadow .15s ease, transform .15s ease;position:relative;border:1.5px solid var(--line);}
+  .trip-card:hover{box-shadow:var(--shadow-hover);transform:translateY(-2px) rotate(-.3deg);}
+  .trip-card .stub{width:96px;flex:none;background:var(--paper-tint);color:var(--ink);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;position:relative;padding:12px 6px;text-align:center;border-right:2px dashed var(--line);}
+  .trip-card .stub::before{content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%) rotate(-3deg);
+    width:34px;height:14px;background:rgba(232,184,75,.75);box-shadow:0 1px 2px rgba(58,50,41,.15);}
+  .trip-card:nth-of-type(3n+2) .stub::before{background:rgba(143,168,136,.75);}
+  .trip-card:nth-of-type(3n+3) .stub::before{background:rgba(157,186,209,.75);}
+  .trip-card .stub .num{font-family:'Iansui',cursive;font-weight:400;font-size:27px;color:var(--ink);line-height:1;}
+  .trip-card .stub .lbl{font-size:9.5px;letter-spacing:.1em;color:var(--text-soft);margin-top:5px;text-transform:uppercase;}
   .trip-card .body{padding:16px 20px;flex:1;min-width:0;}
-  .trip-card .body h3{margin:0 0 4px;font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:var(--ink);
+  .trip-card .body h3{margin:0 0 4px;font-family:'Iansui',cursive;font-weight:400;font-size:19px;color:var(--ink);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .trip-card .body .dates{font-size:12px;color:var(--text-soft);margin-bottom:10px;}
   .budget-mini{display:flex;gap:20px;font-size:13px;}
@@ -94,11 +136,11 @@
   .trip-del{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.85);border-radius:7px;}
 
   /* Modal */
-  .overlay{position:fixed;inset:0;background:rgba(19,42,62,.55);backdrop-filter:blur(2px);display:flex;align-items:center;
+  .overlay{position:fixed;inset:0;background:rgba(58,50,41,.55);backdrop-filter:blur(2px);display:flex;align-items:center;
     justify-content:center;padding:20px;z-index:50;}
   .modal{background:var(--paper);border-radius:var(--radius-lg);max-width:520px;width:100%;padding:28px;max-height:88vh;
-    overflow:auto;box-shadow:0 24px 60px rgba(19,42,62,.35);}
-  .modal h3{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:0 0 6px;color:var(--ink);}
+    overflow:auto;box-shadow:0 24px 60px rgba(58,50,41,.35);}
+  .modal h3{font-family:'Iansui',cursive;font-weight:400;font-size:21px;margin:0 0 6px;color:var(--ink);}
   .modal .lead{font-size:12.5px;color:var(--text-soft);margin:0 0 18px;}
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:11.5px;font-weight:700;color:var(--text-soft);margin-bottom:6px;
@@ -115,16 +157,19 @@
   .back-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
   .back-link{color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;}
   .back-link:hover{color:var(--teal);}
-  .trip-banner{background:var(--ink);color:#F6F2E7;border-radius:var(--radius-lg);padding:26px 28px;margin-bottom:16px;
+  .trip-banner{background:var(--ink);color:#FBF6EA;border-radius:var(--radius-lg);padding:26px 28px;margin-bottom:16px;
     box-shadow:var(--shadow-card);}
-  .trip-banner h2{font-family:'Fraunces',serif;font-weight:600;font-size:28px;margin:0 0 6px;}
+  .trip-banner h2{font-family:'Iansui',cursive;font-weight:400;font-size:28px;margin:0 0 6px;}
   .trip-banner .dates{font-family:'IBM Plex Mono',monospace;color:var(--amber);font-size:13px;letter-spacing:.02em;}
-  .trip-banner .notes{color:rgba(246,242,231,.7);font-size:13.5px;margin-top:10px;max-width:560px;}
+  .trip-banner .notes{color:rgba(251,246,234,.7);font-size:13.5px;margin-top:10px;max-width:560px;}
   .trip-banner .actions-row{margin-top:16px;}
 
-  .section{background:var(--paper);border-radius:var(--radius-lg);padding:22px 24px;margin-bottom:16px;box-shadow:var(--shadow-card);}
+  .section{background:var(--paper);border-radius:var(--radius-lg);padding:22px 24px;margin-bottom:16px;box-shadow:var(--shadow-card);
+    position:relative;border-left:3px solid var(--amber);}
+  .section:nth-of-type(3n+2){border-left-color:var(--teal);}
+  .section:nth-of-type(3n+3){border-left-color:var(--sky);}
   .section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
-  .section-head h3{font-family:'Fraunces',serif;font-weight:600;font-size:18px;margin:0;color:var(--ink);}
+  .section-head h3{font-family:'Iansui',cursive;font-weight:400;font-size:18px;margin:0;color:var(--ink);}
   .section-head .sub{font-size:12px;color:var(--text-soft);}
   .empty-hint{color:var(--text-soft);font-size:13px;background:var(--paper-tint);border-radius:var(--radius-md);padding:16px;}
 
@@ -157,7 +202,7 @@
   .day-block:first-child .day-title{margin-top:0;}
   .day-title:hover{background:var(--paper-tint);}
   .day-title-left{display:flex;align-items:center;gap:10px;min-width:0;}
-  .day-title h4{font-family:'Fraunces',serif;font-weight:600;font-size:13px;margin:0;color:var(--ink);
+  .day-title h4{font-family:'Iansui',cursive;font-weight:400;font-size:13px;margin:0;color:var(--ink);
     background:var(--paper-tint);padding:5px 14px;border-radius:20px;letter-spacing:.02em;flex:none;}
   .day-title .chevron{display:inline-block;color:var(--text-soft);font-size:13px;transition:transform .15s ease;flex:none;}
   .day-block.is-collapsed .chevron{transform:rotate(-90deg);}
@@ -228,7 +273,7 @@
   .ledger-total{display:flex;justify-content:flex-end;gap:26px;margin-top:16px;padding-top:14px;border-top:1.5px dashed var(--line);
     font-family:'IBM Plex Mono',monospace;font-size:13.5px;}
 
-  .lightbox{position:fixed;inset:0;background:rgba(15,20,26,.9);display:flex;align-items:center;justify-content:center;
+  .lightbox{position:fixed;inset:0;background:rgba(30,25,18,.9);display:flex;align-items:center;justify-content:center;
     z-index:80;padding:24px;}
   .lightbox img{max-width:90vw;max-height:78vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
   .lightbox .lb-actions{position:absolute;top:22px;right:22px;display:flex;gap:10px;}
@@ -237,7 +282,7 @@
     border-radius:var(--radius-sm);font-size:13px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.3);}
   .icon-btn{background:none;border:none;cursor:pointer;color:var(--text-soft);font-size:15px;padding:5px;border-radius:6px;
     transition:color .1s ease,background .1s ease;}
-  .icon-btn:hover{color:var(--clay);background:rgba(184,92,62,.1);}
+  .icon-btn:hover{color:var(--clay);background:rgba(217,138,147,.1);}
   .drop-file{border:1.5px dashed var(--line);border-radius:var(--radius-md);padding:16px;text-align:center;cursor:pointer;
     background:var(--paper-tint);}
   .drop-file:hover{border-color:var(--amber-deep);}
@@ -275,21 +320,58 @@ const App = (function(){
   }
 
   const STORAGE_PREFIX = 'travel-log:';
+  const SYNC_CODE_KEY = 'travel-log:sync-code';
+  function getSyncCode(){ return localStorage.getItem(SYNC_CODE_KEY) || ''; }
+  function setSyncCodeLocal(code){
+    if(code) localStorage.setItem(SYNC_CODE_KEY, code);
+    else localStorage.removeItem(SYNC_CODE_KEY);
+  }
+
   async function save(key, value){
+    const json = JSON.stringify(value);
     try{
-      localStorage.setItem(STORAGE_PREFIX+key, JSON.stringify(value));
-      return true;
+      localStorage.setItem(STORAGE_PREFIX+key, json);
     }catch(e){
       console.error(e);
-      toast('儲存失敗，瀏覽器儲存空間可能已滿（照片太多時容易發生）');
-      return null;
+      toast('本機儲存失敗，瀏覽器儲存空間可能已滿（照片太多時容易發生）');
     }
+    const code = getSyncCode();
+    if(code && window.fbSaveEntry){
+      try{ await window.fbSaveEntry(code, key, json); }
+      catch(e){ console.error(e); toast('雲端同步失敗，已先存在本機'); }
+    }
+    return true;
   }
   async function load(key){
+    const code = getSyncCode();
+    if(code && window.fbLoadEntry){
+      try{
+        const v = await window.fbLoadEntry(code, key);
+        if(v !== null){
+          localStorage.setItem(STORAGE_PREFIX+key, v);
+          return JSON.parse(v);
+        }
+      }catch(e){ console.error(e); toast('雲端讀取失敗，改用本機資料'); }
+    }
     try{
-      const v = localStorage.getItem(STORAGE_PREFIX+key);
-      return v ? JSON.parse(v) : null;
+      const local = localStorage.getItem(STORAGE_PREFIX+key);
+      return local ? JSON.parse(local) : null;
     }catch(e){ return null; }
+  }
+
+  // Push everything currently cached locally up to the cloud under a sync code
+  // (used the first time a code is set on a device that already has trips).
+  async function migrateLocalToCloud(code){
+    if(!window.fbSaveEntry) return;
+    for(let i=0; i<localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf(STORAGE_PREFIX)===0 && k!==SYNC_CODE_KEY){
+        const entryKey = k.slice(STORAGE_PREFIX.length);
+        const val = localStorage.getItem(k);
+        try{ await window.fbSaveEntry(code, entryKey, val); }
+        catch(e){ console.error(e); }
+      }
+    }
   }
 
   function compressImage(file, maxDim, quality){
@@ -347,6 +429,22 @@ const App = (function(){
   function openNewTripModal(){ state.modal = {type:'new-trip'}; render(); }
   function openImportModal(){ state.modal = {type:'import'}; state.importFile = null; render(); }
   function closeModal(){ state.modal = null; render(); }
+
+  function openSyncModal(){ state.modal = {type:'sync'}; render(); }
+  async function submitSyncCode(){
+    const val = document.getElementById('f-sync-code').value.trim();
+    const hadLocalData = state.trips && state.trips.length > 0;
+    setSyncCodeLocal(val);
+    state.modal = null;
+    render();
+    if(val && window.__cloudReady && hadLocalData){
+      toast('正在把本機資料同步到雲端...');
+      await migrateLocalToCloud(val);
+    }
+    state.trips = []; state.items = {}; state.expenses = {}; state.covers = {}; state.currentTripId = null;
+    await init();
+    toast(val ? '同步碼已套用' : '已切換回本機模式');
+  }
 
   async function submitNewTrip(){
     const name = document.getElementById('f-name').value.trim();
@@ -699,7 +797,9 @@ const App = (function(){
 
   // ---------- Render ----------
   function render(){
+    const syncCode = getSyncCode();
     document.getElementById('topbar-actions').innerHTML = state.currentTripId ? '' :
+      '<button class="btn btn-ghost" onclick="App.openSyncModal()">'+(syncCode?'☁ 已同步':'☁ 雲端同步')+'</button>'+
       '<button class="btn btn-ghost" onclick="App.downloadTemplate()">下載範本</button>'+
       '<button class="btn btn-ghost" onclick="App.openImportModal()">匯入 Excel</button>'+
       '<button class="btn btn-amber" onclick="App.openNewTripModal()">+ 新增行程</button>';
@@ -1005,12 +1105,26 @@ const App = (function(){
         '<button class="btn btn-amber" onclick="App.submitImportExcel()">匯入</button></div>'+
       '</div></div>';
     }
+    if(m.type==='sync'){
+      const code = getSyncCode();
+      const cloudOk = !!window.__cloudReady;
+      return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
+        '<h3>雲端同步</h3>'+
+        '<p class="lead">設定一組同步碼，在其他裝置輸入同樣的碼，就能讀到同一份行程資料。</p>'+
+        (!cloudOk ? '<div class="template-box">⚠️ 目前還沒有連上雲端資料庫（尚未設定 Firebase）。設定好之後，資料才會真的同步到雲端；在那之前，這裡設定的碼不會有作用，資料仍只存在這台裝置。</div>' : '')+
+        '<div class="field"><label>同步碼</label><input id="f-sync-code" type="text" value="'+esc(code)+'" placeholder="自己設一組英數字，例如 taipei2026trip"></div>'+
+        '<div class="template-box">⚠️ 這組碼沒有帳號密碼保護——知道碼的人就能看到、修改甚至刪除這份資料，請不要用容易被猜到的字，也不要公開分享這組碼。</div>'+
+        '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
+        '<button class="btn btn-amber" onclick="App.submitSyncCode()">儲存並套用</button></div>'+
+      '</div></div>';
+    }
     return '';
   }
 
   return {
     init, render, openTrip, goHome,
     openNewTripModal, openImportModal, closeModal, submitNewTrip,
+    openSyncModal, submitSyncCode,
     openEditTripModal, submitEditTrip, deleteTrip,
     downloadTemplate, handleImportFileChange, submitImportExcel,
     handleCoverUpload, deleteCoverImage,
