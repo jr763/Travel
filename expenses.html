@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日常帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Iansui&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script type="module">
+  // ====================================================================
+  // 雲端同步設定（選填，跟行程網站是同一個 Firebase 專案也沒關係，
+  // 資料會存在不同的資料表，不會互相影響）。
+  // ====================================================================
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDMDncYJsa2wkToqQ6tc602_cv5fx04lz4",
+    authDomain: "travel-log-311ad.firebaseapp.com",
+    projectId: "travel-log-311ad",
+    storageBucket: "travel-log-311ad.firebasestorage.app",
+    messagingSenderId: "1056165929289",
+    appId: "1:1056165929289:web:1b86c72fc1c3fe72407a98"
+  };
+  // ====================================================================
+
+  window.__cloudReady = false;
+  if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY") {
+    try {
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const { getFirestore, doc, getDoc, setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      const app = initializeApp(FIREBASE_CONFIG);
+      const db = getFirestore(app);
+      window.fbSaveEntry = async function(code, key, valueStr){
+        await setDoc(doc(db, 'daily-expense-log', code, 'entries', key), { value: valueStr, updatedAt: Date.now() });
+      };
+      window.fbLoadEntry = async function(code, key){
+        const snap = await getDoc(doc(db, 'daily-expense-log', code, 'entries', key));
+        return snap.exists() ? snap.data().value : null;
+      };
+      window.__cloudReady = true;
+    } catch (e) {
+      console.error('Firebase 初始化失敗', e);
+    }
+  }
+</script>
+<style>
+  :root{
+    --ink:#3A3229;
+    --ink-soft:#6B6255;
+    --bg-page:#F3EADA;
+    --paper:#FFFBF3;
+    --paper-tint:#EFE4CE;
+    --amber:#E8B84B;
+    --amber-deep:#C99A2E;
+    --clay:#D98A93;
+    --teal:#8FA888;
+    --sky:#9DBAD1;
+    --line:#E1D3B6;
+    --line-soft:#EBE1CA;
+    --text:#3D3327;
+    --text-soft:#93876E;
+    --radius-lg:9px;
+    --radius-md:6px;
+    --radius-sm:4px;
+    --shadow-card:0 1px 2px rgba(58,50,41,.07), 0 8px 18px -10px rgba(58,50,41,.22);
+    --shadow-hover:0 1px 2px rgba(58,50,41,.09), 0 14px 26px -10px rgba(58,50,41,.28);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg-page);color:var(--text);font-family:'Inter',sans-serif;line-height:1.45;
+    background-image:radial-gradient(circle at 1px 1px, rgba(58,50,41,.16) 1px, transparent 0);
+    background-size:18px 18px;}
+  .mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+
+  input,select,textarea{font-family:'Inter',sans-serif;font-size:14px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:var(--radius-sm);background:var(--paper);color:var(--text);outline:none;transition:border-color .12s ease, box-shadow .12s ease;}
+  input:focus,select:focus,textarea:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(201,154,46,.18);}
+  input[type=number],input[type=date]{font-family:'IBM Plex Mono',monospace;}
+
+  #topbar{background:var(--ink);color:#FBF6EA;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 4px 18px rgba(58,50,41,.22);position:sticky;top:0;z-index:20;flex-wrap:wrap;gap:12px;}
+  #topbar .brand{display:flex;align-items:center;gap:11px;}
+  #topbar .brand .mark{width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--amber);display:flex;
+    align-items:center;justify-content:center;border:2px solid var(--amber);transform:rotate(-6deg);
+    font-family:'Iansui',cursive;font-weight:400;font-size:16px;flex:none;}
+  #topbar .brand h1{font-family:'Iansui',cursive;font-weight:400;font-size:21px;margin:0;letter-spacing:.01em;}
+  #topbar .brand .tag{color:rgba(251,246,234,.5);font-size:11.5px;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;display:block;margin-top:1px;}
+  #view{max-width:760px;margin:0 auto;padding:32px 22px 90px;}
+
+  .btn{font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;border:none;border-radius:var(--radius-sm);
+    padding:10px 17px;cursor:pointer;transition:transform .08s ease, box-shadow .08s ease, background .12s ease;
+    display:inline-flex;align-items:center;gap:6px;}
+  .btn:active{transform:scale(.96);}
+  .btn-amber{background:var(--amber);color:var(--ink);box-shadow:0 2px 0 var(--amber-deep);}
+  .btn-amber:hover{background:#eec468;}
+  .btn-ghost{background:rgba(251,246,234,.08);color:#FBF6EA;border:1px solid rgba(251,246,234,.3);}
+  .btn-ghost:hover{background:rgba(251,246,234,.16);}
+  .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--line);}
+  .btn-outline:hover{border-color:var(--ink);background:var(--paper-tint);}
+  .btn-sm{padding:7px 12px;font-size:12.5px;border-radius:7px;}
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--text-soft);font-size:15px;padding:5px;border-radius:6px;}
+  .icon-btn:hover{color:var(--clay);background:rgba(217,138,147,.12);}
+
+  .summary-card{background:var(--ink);color:#FBF6EA;border-radius:var(--radius-lg);padding:24px 26px;margin-bottom:20px;
+    box-shadow:var(--shadow-card);}
+  .summary-card h2{font-family:'Iansui',cursive;font-weight:400;font-size:22px;margin:0 0 14px;}
+  .summary-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:13px;color:rgba(251,246,234,.7);}
+  .summary-row b{font-family:'IBM Plex Mono',monospace;font-size:18px;color:#FBF6EA;}
+  .summary-bar{background:rgba(251,246,234,.15);border-radius:6px;height:14px;overflow:hidden;margin:10px 0 6px;}
+  .summary-bar-fill{height:100%;border-radius:6px;background:var(--amber);transition:width .3s ease;}
+  .summary-bar-fill.over{background:var(--clay);}
+  .summary-status{font-size:12.5px;margin-top:6px;}
+  .summary-status.over{color:var(--clay);} .summary-status.under{color:#B9D9B2;}
+  .no-budget-hint{font-size:12px;color:rgba(251,246,234,.6);margin-top:8px;}
+
+  .month-block{background:var(--paper);border-radius:var(--radius-lg);margin-bottom:12px;box-shadow:var(--shadow-card);overflow:hidden;}
+  .month-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;gap:10px;flex-wrap:wrap;}
+  .month-head:hover{background:var(--paper-tint);}
+  .month-head-left{display:flex;align-items:center;gap:10px;min-width:0;}
+  .chevron-sm{color:var(--text-soft);font-size:11px;flex:none;transition:transform .15s ease;}
+  .month-block.is-collapsed .chevron-sm{transform:rotate(-90deg);}
+  .month-title{font-family:'Iansui',cursive;font-weight:400;font-size:16px;color:var(--ink);}
+  .month-meta{font-size:12px;color:var(--text-soft);}
+  .month-amounts{display:flex;align-items:center;gap:10px;font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:600;}
+  .month-amounts.over{color:var(--clay);} .month-amounts.under{color:var(--teal);}
+  .month-body{padding:0 16px 16px;}
+  .month-body.is-collapsed{display:none;}
+  .empty-hint{color:var(--text-soft);font-size:13px;background:var(--paper-tint);border-radius:var(--radius-md);padding:16px;text-align:center;}
+
+  .entry-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:12px 14px;margin-top:10px;}
+  .entry-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .entry-top input[type=date]{width:132px;font-size:12.5px;padding:7px 8px;}
+  .entry-top select{width:96px;font-size:12.5px;padding:7px 8px;}
+  .entry-top input.desc{flex:1;min-width:120px;font-size:13px;padding:7px 9px;}
+  .entry-bottom{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .payer-pill{font-family:'Inter',sans-serif;font-size:11px;font-weight:700;padding:6px 9px;border-radius:20px;
+    border:1px dashed var(--line);background:var(--paper);color:var(--text-soft);cursor:pointer;flex:none;}
+  .payer-pill:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
+  .payer-pill.is-set{border-style:solid;border-color:var(--amber-deep);background:var(--amber);color:var(--ink);}
+  .amount-input{width:100px;font-weight:600;}
+  .receipt-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line);}
+  .receipt-add{width:40px;height:40px;border-radius:6px;border:1.5px dashed var(--line);display:flex;align-items:center;
+    justify-content:center;cursor:pointer;color:var(--text-soft);font-size:16px;background:var(--paper);flex:none;}
+  .receipt-add:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
+
+  .overlay{position:fixed;inset:0;background:rgba(58,50,41,.55);backdrop-filter:blur(2px);display:flex;align-items:center;
+    justify-content:center;padding:20px;z-index:50;}
+  .modal{background:var(--paper);border-radius:var(--radius-lg);max-width:440px;width:100%;padding:26px;max-height:88vh;
+    overflow:auto;box-shadow:0 24px 60px rgba(58,50,41,.35);}
+  .modal h3{font-family:'Iansui',cursive;font-weight:400;font-size:20px;margin:0 0 6px;color:var(--ink);}
+  .modal .lead{font-size:12.5px;color:var(--text-soft);margin:0 0 16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11.5px;font-weight:700;color:var(--text-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;}
+  .field input{width:100%;}
+  .modal .actions-row{margin-top:18px;justify-content:flex-end;}
+  .template-box{background:var(--paper-tint);border:1px solid var(--line);border-radius:var(--radius-md);padding:12px 14px;
+    margin-bottom:14px;font-size:12px;color:var(--text-soft);}
+
+  .lightbox{position:fixed;inset:0;background:rgba(20,16,10,.9);display:flex;align-items:center;justify-content:center;z-index:80;padding:24px;}
+  .lightbox img{max-width:90vw;max-height:78vh;border-radius:10px;}
+  .lightbox .lb-actions{position:absolute;top:22px;right:22px;display:flex;gap:10px;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#FBF6EA;padding:11px 20px;
+    border-radius:var(--radius-sm);font-size:13px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.3);}
+
+  @media(max-width:520px){
+    #topbar{padding:14px 16px;}
+    #view{padding:22px 14px 90px;}
+    .summary-card{padding:20px 20px;}
+    .entry-top input[type=date],.entry-top select{width:auto;flex:1;min-width:90px;}
+  }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="brand"><div class="mark">帳</div><div><h1>日常帳</h1><span class="tag">日常開銷 · 預算追蹤</span></div></div>
+  <div class="actions-row" id="topbar-actions"></div>
+</div>
+<div id="view"></div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+const App = (function(){
+  const state = { budget: 0, monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null };
+
+  function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
+  function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function currentMonthKey(){ return todayStr().slice(0,7); }
+  function monthLabel(mk){ const [y,m]=mk.split('-'); return y+'年'+Number(m)+'月'; }
+
+  function toast(msg){
+    const root = document.getElementById('toast-root');
+    root.innerHTML = '<div class="toast">'+esc(msg)+'</div>';
+    setTimeout(()=>{ if(root.firstChild) root.innerHTML=''; }, 2400);
+  }
+
+  // ---------- Storage (local + optional cloud sync, independent of the trip app) ----------
+  const STORAGE_PREFIX = 'daily-expense:';
+  const SYNC_CODE_KEY = 'daily-expense:sync-code';
+  function getSyncCode(){ return localStorage.getItem(SYNC_CODE_KEY) || ''; }
+  function setSyncCodeLocal(code){ if(code) localStorage.setItem(SYNC_CODE_KEY, code); else localStorage.removeItem(SYNC_CODE_KEY); }
+
+  async function save(key, value){
+    const json = JSON.stringify(value);
+    try{ localStorage.setItem(STORAGE_PREFIX+key, json); }
+    catch(e){ console.error(e); toast('本機儲存失敗，空間可能已滿'); }
+    const code = getSyncCode();
+    if(code && window.fbSaveEntry){
+      try{ await window.fbSaveEntry(code, key, json); }
+      catch(e){ console.error(e); toast('雲端同步失敗，已先存在本機'); }
+    }
+    return true;
+  }
+  async function load(key){
+    const code = getSyncCode();
+    if(code && window.fbLoadEntry){
+      try{
+        const v = await window.fbLoadEntry(code, key);
+        if(v !== null){ localStorage.setItem(STORAGE_PREFIX+key, v); return JSON.parse(v); }
+      }catch(e){ console.error(e); toast('雲端讀取失敗，改用本機資料'); }
+    }
+    try{ const local = localStorage.getItem(STORAGE_PREFIX+key); return local ? JSON.parse(local) : null; }
+    catch(e){ return null; }
+  }
+  async function migrateLocalToCloud(code){
+    if(!window.fbSaveEntry) return;
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf(STORAGE_PREFIX)===0 && k!==SYNC_CODE_KEY){
+        const entryKey = k.slice(STORAGE_PREFIX.length);
+        const val = localStorage.getItem(k);
+        try{ await window.fbSaveEntry(code, entryKey, val); }catch(e){ console.error(e); }
+      }
+    }
+  }
+
+  function compressImage(file, maxDim, quality){
+    maxDim = maxDim || 900; quality = quality || 0.65;
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('讀取檔案失敗'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('圖片解析失敗'));
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          if(w > maxDim || h > maxDim){
+            if(w > h){ h = Math.round(h * maxDim / w); w = maxDim; }
+            else{ w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---------- Init ----------
+  async function init(){
+    state.budget = (await load('budget')) || 0;
+    state.monthsIndex = (await load('months-index')) || [];
+    const cur = currentMonthKey();
+    if(state.monthsIndex.indexOf(cur) === -1){
+      state.monthsIndex.push(cur);
+      state.monthsIndex.sort().reverse();
+      await save('months-index', state.monthsIndex);
+    }
+    state.expandedMonths[cur] = true;
+    await loadMonthEntries(cur);
+    render();
+  }
+  async function loadMonthEntries(mk){
+    if(state.entriesByMonth[mk]) return;
+    state.entriesByMonth[mk] = (await load('entries-'+mk)) || [];
+  }
+  async function toggleMonth(mk){
+    state.expandedMonths[mk] = !state.expandedMonths[mk];
+    if(state.expandedMonths[mk]) await loadMonthEntries(mk);
+    render();
+  }
+
+  // ---------- Budget ----------
+  function openBudgetModal(){ state.modal = {type:'budget'}; render(); }
+  async function submitBudget(){
+    const val = Number(document.getElementById('f-budget').value) || 0;
+    state.budget = val;
+    await save('budget', val);
+    state.modal = null;
+    render();
+  }
+
+  // ---------- Entries ----------
+  async function addEntry(){
+    const mk = currentMonthKey();
+    await loadMonthEntries(mk);
+    state.entriesByMonth[mk].unshift({ id: uid(), date: todayStr(), category:'其他', description:'', amount:0, payer:'', image:null });
+    await save('entries-'+mk, state.entriesByMonth[mk]);
+    state.expandedMonths[mk] = true;
+    render();
+  }
+  async function updateEntryField(mk, entryId, field, value){
+    const arr = state.entriesByMonth[mk];
+    const entry = arr && arr.find(e=>e.id===entryId);
+    if(!entry) return;
+    if(field==='amount') value = Number(value)||0;
+    entry[field] = value;
+    await save('entries-'+mk, arr);
+    render();
+  }
+  async function updateEntryDate(mk, entryId, newDate){
+    const arr = state.entriesByMonth[mk];
+    const idx = arr.findIndex(e=>e.id===entryId);
+    if(idx<0) return;
+    const entry = arr[idx];
+    entry.date = newDate;
+    const newMk = newDate.slice(0,7);
+    if(newMk !== mk){
+      arr.splice(idx,1);
+      await save('entries-'+mk, arr);
+      await loadMonthEntries(newMk);
+      state.entriesByMonth[newMk].push(entry);
+      await save('entries-'+newMk, state.entriesByMonth[newMk]);
+      if(state.monthsIndex.indexOf(newMk)===-1){
+        state.monthsIndex.push(newMk); state.monthsIndex.sort().reverse();
+        await save('months-index', state.monthsIndex);
+      }
+      state.expandedMonths[newMk] = true;
+    } else {
+      await save('entries-'+mk, arr);
+    }
+    render();
+  }
+  function cyclePayer(mk, entryId){
+    const arr = state.entriesByMonth[mk];
+    const entry = arr && arr.find(e=>e.id===entryId);
+    if(!entry) return;
+    const cycle = ['', '蒨', '浚'];
+    entry.payer = cycle[(cycle.indexOf(entry.payer||'')+1) % cycle.length];
+    save('entries-'+mk, arr);
+    render();
+  }
+  async function handleEntryImage(ev, mk, entryId){
+    const file = (ev.target.files||[])[0];
+    if(!file) return;
+    const arr = state.entriesByMonth[mk];
+    const entry = arr.find(e=>e.id===entryId);
+    try{ entry.image = await compressImage(file, 900, 0.65); }
+    catch(e){ toast('圖片處理失敗'); }
+    await save('entries-'+mk, arr);
+    render();
+  }
+  async function deleteEntry(mk, entryId){
+    if(!confirm('刪除這筆紀錄？')) return;
+    state.entriesByMonth[mk] = state.entriesByMonth[mk].filter(e=>e.id!==entryId);
+    await save('entries-'+mk, state.entriesByMonth[mk]);
+    render();
+  }
+
+  // ---------- Lightbox ----------
+  let lightboxCtx = null;
+  function openLightbox(mk, entryId){ lightboxCtx = {mk, entryId}; render(); }
+  function closeLightbox(){ lightboxCtx = null; render(); }
+  async function deleteLightboxImage(){
+    if(!lightboxCtx) return;
+    const {mk, entryId} = lightboxCtx;
+    const entry = state.entriesByMonth[mk].find(e=>e.id===entryId);
+    if(entry) entry.image = null;
+    await save('entries-'+mk, state.entriesByMonth[mk]);
+    lightboxCtx = null;
+    render();
+  }
+
+  // ---------- Sync modal ----------
+  function openSyncModal(){ state.modal = {type:'sync'}; render(); }
+  async function submitSyncCode(){
+    const val = document.getElementById('f-sync-code').value.trim();
+    const hadLocalData = state.monthsIndex && state.monthsIndex.length > 0;
+    setSyncCodeLocal(val);
+    state.modal = null;
+    render();
+    if(val && window.__cloudReady && hadLocalData){
+      toast('正在把本機資料同步到雲端...');
+      await migrateLocalToCloud(val);
+    }
+    state.budget = 0; state.monthsIndex = []; state.entriesByMonth = {}; state.expandedMonths = {};
+    await init();
+    toast(val ? '同步碼已套用' : '已切換回本機模式');
+  }
+  function closeModal(){ state.modal = null; render(); }
+
+  // ---------- Render ----------
+  function render(){
+    const syncCode = getSyncCode();
+    document.getElementById('topbar-actions').innerHTML =
+      '<button class="btn btn-ghost" onclick="App.openSyncModal()">'+(syncCode?'☁ 已同步':'☁ 雲端同步')+'</button>'+
+      '<button class="btn btn-ghost" onclick="App.openBudgetModal()">⚙ 設定預算</button>'+
+      '<button class="btn btn-amber" onclick="App.addEntry()">+ 新增花費</button>';
+
+    const curMk = currentMonthKey();
+    const curTotal = (state.entriesByMonth[curMk]||[]).reduce((s,e)=>s+(Number(e.amount)||0),0);
+    const budget = state.budget||0;
+    const over = budget>0 && curTotal>budget;
+    const pct = budget>0 ? Math.min(100, curTotal/budget*100) : 0;
+
+    let html = '<div class="summary-card">'+
+      '<h2>'+monthLabel(curMk)+'</h2>'+
+      '<div class="summary-row"><span>本月已花</span><b class="mono">$'+fmt(curTotal)+'</b></div>'+
+      (budget>0 ? (
+        '<div class="summary-bar"><div class="summary-bar-fill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>'+
+        '<div class="summary-row"><span>本月預算</span><b class="mono">$'+fmt(budget)+'</b></div>'+
+        '<div class="summary-status '+(over?'over':'under')+'">'+(over?'⚠️ 已超出預算 $'+fmt(curTotal-budget):'✓ 還剩 $'+fmt(budget-curTotal))+'</div>'
+      ) : '<div class="no-budget-hint">還沒有設定預算，點右上角「設定預算」開始追蹤是否超支。</div>')+
+    '</div>';
+
+    if(!state.monthsIndex.length){
+      html += '<div class="empty-hint">還沒有任何花費紀錄，點右上角「+ 新增花費」開始記帳。</div>';
+    } else {
+      state.monthsIndex.forEach(mk => {
+        const expanded = !!state.expandedMonths[mk];
+        const entries = state.entriesByMonth[mk] || [];
+        const total = entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
+        const mOver = budget>0 && total>budget;
+        html += '<div class="month-block'+(expanded?'':' is-collapsed')+'">'+
+          '<div class="month-head" onclick="App.toggleMonth(\''+mk+'\')">'+
+            '<div class="month-head-left"><span class="chevron-sm">▾</span>'+
+              '<span class="month-title">'+monthLabel(mk)+'</span>'+
+              '<span class="month-meta">'+entries.length+' 筆</span></div>'+
+            '<div class="month-amounts'+(budget>0?(mOver?' over':' under'):'')+'">$'+fmt(total)+
+              (budget>0?(mOver?' ⚠️':' ✓'):'')+'</div>'+
+          '</div>'+
+          '<div class="month-body'+(expanded?'':' is-collapsed')+'">'+
+            (entries.length ? entries.map(e=>renderEntry(mk,e)).join('') : '<div class="empty-hint">這個月還沒有紀錄。</div>')+
+          '</div>'+
+        '</div>';
+      });
+    }
+
+    document.getElementById('view').innerHTML = html;
+    let modalHtml = state.modal ? renderModal() : '';
+    if(lightboxCtx) modalHtml += renderLightbox();
+    document.getElementById('modal-root').innerHTML = modalHtml;
+  }
+
+  function renderEntry(mk, e){
+    const cats = ['餐飲','交通','購物','娛樂','居家','醫療','其他'];
+    return '<div class="entry-row">'+
+      '<div class="entry-top">'+
+        '<input type="date" value="'+esc(e.date)+'" onchange="App.updateEntryDate(\''+mk+'\',\''+e.id+'\',this.value)">'+
+        '<select onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'category\',this.value)">'+
+          cats.map(c=>'<option '+(c===e.category?'selected':'')+'>'+c+'</option>').join('')+
+        '</select>'+
+        '<input type="text" class="desc" placeholder="說明" value="'+esc(e.description)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'description\',this.value)">'+
+        '<button class="icon-btn" title="刪除" onclick="App.deleteEntry(\''+mk+'\',\''+e.id+'\')">✕</button>'+
+      '</div>'+
+      '<div class="entry-bottom">'+
+        '<button type="button" class="payer-pill'+(e.payer?' is-set':'')+'" title="點一下切換付款者" onclick="App.cyclePayer(\''+mk+'\',\''+e.id+'\')">'+(e.payer||'付款者')+'</button>'+
+        '<input type="number" class="amount-input mono" value="'+e.amount+'" placeholder="金額" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'amount\',this.value)">'+
+        (e.image ? '<img class="receipt-thumb" src="'+e.image+'" onclick="App.openLightbox(\''+mk+'\',\''+e.id+'\')">' :
+          '<label class="receipt-add">＋<input type="file" accept="image/*" style="display:none" onchange="App.handleEntryImage(event,\''+mk+'\',\''+e.id+'\')"></label>')+
+      '</div>'+
+    '</div>';
+  }
+
+  function renderLightbox(){
+    const {mk, entryId} = lightboxCtx;
+    const entry = (state.entriesByMonth[mk]||[]).find(e=>e.id===entryId);
+    if(!entry || !entry.image) return '';
+    return '<div class="overlay" onclick="App.closeLightbox()"><div class="lightbox" onclick="event.stopPropagation()">'+
+      '<img src="'+entry.image+'"><div class="lb-actions">'+
+      '<button class="btn btn-outline btn-sm" style="background:rgba(255,255,255,.9);" onclick="App.deleteLightboxImage()">刪除照片</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="App.closeLightbox()">關閉 ✕</button>'+
+      '</div></div></div>';
+  }
+
+  function renderModal(){
+    const m = state.modal;
+    if(!m) return '';
+    if(m.type==='budget'){
+      return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
+        '<h3>設定每月預算</h3>'+
+        '<p class="lead">設定一個每月花費目標，之後每個月都會用這個金額比對是否超支（可以隨時修改）。</p>'+
+        '<div class="field"><label>每月預算</label><input id="f-budget" type="number" value="'+(state.budget||0)+'" placeholder="例如 20000"></div>'+
+        '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
+        '<button class="btn btn-amber" onclick="App.submitBudget()">儲存</button></div>'+
+      '</div></div>';
+    }
+    if(m.type==='sync'){
+      const code = getSyncCode();
+      const cloudOk = !!window.__cloudReady;
+      return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
+        '<h3>雲端同步</h3>'+
+        '<p class="lead">設定一組同步碼，在其他裝置輸入同樣的碼，就能讀到同一份日常帳資料。這組跟行程網站是分開的，不會共用。</p>'+
+        (!cloudOk ? '<div class="template-box">⚠️ 目前還沒有連上雲端資料庫，資料只會存在這台裝置。</div>' : '')+
+        '<div class="field"><label>同步碼</label><input id="f-sync-code" type="text" value="'+esc(code)+'" placeholder="自己設一組英數字"></div>'+
+        '<div class="template-box">⚠️ 這組碼沒有帳號密碼保護，請不要用容易被猜到的字，也不要公開分享。</div>'+
+        '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
+        '<button class="btn btn-amber" onclick="App.submitSyncCode()">儲存並套用</button></div>'+
+      '</div></div>';
+    }
+    return '';
+  }
+
+  return {
+    init, toggleMonth, openBudgetModal, submitBudget, closeModal,
+    addEntry, updateEntryField, updateEntryDate, cyclePayer, handleEntryImage, deleteEntry,
+    openLightbox, closeLightbox, deleteLightboxImage,
+    openSyncModal, submitSyncCode
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
+</body>
+</html>
