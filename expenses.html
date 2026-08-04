@@ -113,6 +113,20 @@
   .summary-status.over{color:var(--clay);} .summary-status.under{color:#B9D9B2;}
   .no-budget-hint{font-size:12px;color:rgba(251,246,234,.6);margin-top:8px;}
 
+  .settings-menu-list{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
+  .settings-menu-item{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;
+    background:var(--paper-tint);border:1px solid transparent;border-radius:var(--radius-md);padding:12px 14px;
+    cursor:pointer;font-family:'Inter',sans-serif;}
+  .settings-menu-item:hover{border-color:var(--amber-deep);}
+  .settings-menu-item span:first-child{font-weight:700;font-size:14px;color:var(--ink);}
+  .settings-menu-sub{font-size:11.5px;color:var(--text-soft);}
+
+  .cat-budget-row{margin-bottom:12px;}
+  .cat-budget-row:last-child{margin-bottom:0;}
+  .cat-budget-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;}
+  .cat-budget-bar{margin:0;}
+  .over-text{color:var(--clay);font-weight:700;}
+
   .month-block{background:var(--paper);border-radius:var(--radius-lg);margin-bottom:12px;box-shadow:var(--shadow-card);overflow:hidden;}
   .month-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;gap:10px;flex-wrap:wrap;}
   .month-head:hover{background:var(--paper-tint);}
@@ -142,11 +156,11 @@
     border:1px solid var(--line);cursor:pointer;flex:none;background:var(--paper);color:var(--text-soft);}
   .flow-pill.expense{border-color:var(--clay);color:var(--clay);}
   .flow-pill.income{border-color:var(--teal);background:var(--teal);color:#fff;}
-  .entry-bottom{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
-  .payer-pill{font-family:'Inter',sans-serif;font-size:11px;font-weight:700;padding:6px 9px;border-radius:20px;
-    border:1px dashed var(--line);background:var(--paper);color:var(--text-soft);cursor:pointer;flex:none;}
-  .payer-pill:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
-  .payer-pill.is-set{border-style:solid;border-color:var(--amber-deep);background:var(--amber);color:var(--ink);}
+  .entry-pay-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;
+    flex-wrap:wrap;padding:6px 2px;border-radius:6px;}
+  .entry-pay-row.pay-highlight{background:rgba(217,138,147,.4);padding:8px 10px;}
+  .pay-label{font-size:12.5px;font-weight:700;color:var(--text);}
+  .entry-pay-right{display:flex;align-items:center;gap:8px;flex:none;}
   .amount-input{width:100px;font-weight:600;}
   .amount-input.is-income{color:var(--teal);}
   .receipt-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line);}
@@ -186,6 +200,9 @@
   .modal{background:var(--paper);border-radius:var(--radius-lg);max-width:440px;width:100%;padding:26px;max-height:88vh;
     overflow:auto;box-shadow:0 24px 60px rgba(58,50,41,.35);}
   .modal h3{font-family:'Iansui',cursive;font-weight:400;font-size:20px;margin:0 0 6px;color:var(--ink);}
+  .modal-head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
+  .modal-head-row h3{margin:0;}
+  .modal-head-row .icon-btn{font-size:16px;margin-top:-2px;}
   .modal .lead{font-size:12.5px;color:var(--text-soft);margin:0 0 16px;}
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:11.5px;font-weight:700;color:var(--text-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;}
@@ -226,7 +243,7 @@
 
 <script>
 const App = (function(){
-  const state = { budget: 0, cardSettings: [], recurringTemplates: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null, showStats: false };
+  const state = { budget: 0, budgetCategories: [], cardSettings: [], recurringTemplates: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null, showStats: false };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
@@ -313,7 +330,8 @@ const App = (function(){
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
   }
   async function init(){
-    state.budget = (await load('budget')) || 0;
+    state.budgetCategories = (await load('budget-categories')) || [];
+    state.budget = state.budgetCategories.reduce((s,c)=>s+(Number(c.amount)||0),0);
     state.cardSettings = (await load('card-settings')) || [];
     state.recurringTemplates = (await load('recurring-templates')) || [];
     state.monthsIndex = (await load('months-index')) || [];
@@ -343,7 +361,7 @@ const App = (function(){
       const day = Math.min(28, Math.max(1, Number(t.dayOfMonth)||1));
       arr.push({ id: uid(), date: mk+'-'+String(day).padStart(2,'0'), category: t.category||'其他',
         description: t.name||'', amount: Number(t.amount)||0, flow:'expense',
-        payMethod: t.payMethod||'現金', payMethodDetail: t.payMethodDetail||'', payer: t.payer||'',
+        payMethod: t.payMethod||'現金', payMethodDetail: t.payMethodDetail||'',
         image:null, recurringId: t.id });
       added++;
     });
@@ -424,15 +442,28 @@ const App = (function(){
     }
   }
 
-  // ---------- Budget ----------
-  function openBudgetModal(){ state.modal = {type:'budget'}; render(); }
-  async function submitBudget(){
-    const val = Number(document.getElementById('f-budget').value) || 0;
-    state.budget = val;
-    await save('budget', val);
+  // ---------- Budget (per category) ----------
+  function openBudgetModal(){
+    state.modal = { type:'budget', draft: (state.budgetCategories||[]).map(c=>({...c})) };
+    render();
+  }
+  function addBudgetRow(){ state.modal.draft.push({ category:'', amount:0 }); render(); }
+  function updateBudgetDraft(idx, field, value){
+    if(field==='amount') value = Number(value)||0;
+    state.modal.draft[idx][field] = value;
+  }
+  function removeBudgetRow(idx){ state.modal.draft.splice(idx,1); render(); }
+  async function submitBudgetCategories(){
+    const draft = state.modal.draft.filter(c => c.category && c.category.trim());
+    state.budgetCategories = draft;
+    state.budget = draft.reduce((s,c)=>s+(Number(c.amount)||0),0);
+    await save('budget-categories', draft);
     state.modal = null;
     render();
   }
+
+  // ---------- Settings menu ----------
+  function openSettingsMenu(){ state.modal = {type:'settings-menu'}; render(); }
 
   // ---------- Credit card closing-day settings ----------
   function openCardSettingsModal(){ state.modal = {type:'card-settings', draft: (state.cardSettings||[]).map(c=>({...c}))}; render(); }
@@ -456,8 +487,8 @@ const App = (function(){
     render();
   }
   function addRecurringRow(){
-    state.modal.draft.push({ id: uid(), name:'', category:'其他', amount:0, dayOfMonth:1,
-      payMethod:'現金', payMethodDetail:'', payer:'', startMonth: currentMonthKey(), endMonth:'' });
+    state.modal.draft.push({ id: uid(), name:'', category:'', amount:0, dayOfMonth:1,
+      payMethod:'現金', payMethodDetail:'', startMonth: currentMonthKey(), endMonth:'' });
     render();
   }
   function updateRecurringDraft(idx, field, value){
@@ -480,8 +511,8 @@ const App = (function(){
   async function addEntry(){
     const mk = currentMonthKey();
     await loadMonthEntries(mk);
-    state.entriesByMonth[mk].unshift({ id: uid(), date: todayStr(), category:'其他', description:'', amount:0,
-      flow:'expense', payMethod:'現金', payMethodDetail:'', payer:'', image:null });
+    state.entriesByMonth[mk].unshift({ id: uid(), date: todayStr(), category:'', description:'', amount:0,
+      flow:'expense', payMethod:'現金', payMethodDetail:'', image:null });
     await save('entries-'+mk, state.entriesByMonth[mk]);
     state.expandedMonths[mk] = true;
     render();
@@ -524,15 +555,6 @@ const App = (function(){
     } else {
       await save('entries-'+mk, arr);
     }
-    render();
-  }
-  function cyclePayer(mk, entryId){
-    const arr = state.entriesByMonth[mk];
-    const entry = arr && arr.find(e=>e.id===entryId);
-    if(!entry) return;
-    const cycle = ['', '蒨', '浚'];
-    entry.payer = cycle[(cycle.indexOf(entry.payer||'')+1) % cycle.length];
-    save('entries-'+mk, arr);
     render();
   }
   async function handleEntryImage(ev, mk, entryId){
@@ -578,7 +600,7 @@ const App = (function(){
       toast('正在把本機資料同步到雲端...');
       await migrateLocalToCloud(val);
     }
-    state.budget = 0; state.cardSettings = []; state.monthsIndex = []; state.entriesByMonth = {}; state.expandedMonths = {};
+    state.budget = 0; state.budgetCategories = []; state.cardSettings = []; state.monthsIndex = []; state.entriesByMonth = {}; state.expandedMonths = {};
     await init();
     toast(val ? '同步碼已套用' : '已切換回本機模式');
   }
@@ -586,12 +608,9 @@ const App = (function(){
 
   // ---------- Render ----------
   function render(){
-    const syncCode = getSyncCode();
     document.getElementById('topbar-actions').innerHTML =
-      '<button class="btn btn-ghost" onclick="App.openSyncModal()">'+(syncCode?'已同步':'雲端同步')+'</button>'+
       '<button class="btn btn-ghost'+(state.showStats?' is-active':'')+'" onclick="App.toggleStats()">統計</button>'+
-      '<button class="btn btn-ghost" onclick="App.openRecurringModal()">固定支出</button>'+
-      '<button class="btn btn-ghost" onclick="App.openBudgetModal()">設定預算</button>'+
+      '<button class="btn btn-outline" onclick="App.openSettingsMenu()">設定</button>'+
       '<button class="btn btn-amber" onclick="App.addEntry()">+ 新增花費</button>';
 
     const curMk = currentMonthKey();
@@ -599,6 +618,7 @@ const App = (function(){
     const curExpense = curEntries.filter(e=>(e.flow||'expense')!=='income').reduce((s,e)=>s+(Number(e.amount)||0),0);
     const curIncome = curEntries.filter(e=>e.flow==='income').reduce((s,e)=>s+(Number(e.amount)||0),0);
     const budget = state.budget||0;
+    const budgetCategories = state.budgetCategories||[];
     const over = budget>0 && curExpense>budget;
     const pct = budget>0 ? Math.min(100, curExpense/budget*100) : 0;
 
@@ -610,8 +630,24 @@ const App = (function(){
         '<div class="summary-bar"><div class="summary-bar-fill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>'+
         '<div class="summary-row"><span>本月預算</span><b class="mono">$'+fmt(budget)+'</b></div>'+
         '<div class="summary-status '+(over?'over':'under')+'">'+(over?'已超出預算 $'+fmt(curExpense-budget):'還剩 $'+fmt(budget-curExpense))+'</div>'
-      ) : '<div class="no-budget-hint">還沒有設定預算，點右上角「設定預算」開始追蹤是否超支。</div>')+
+      ) : '<div class="no-budget-hint">還沒有設定預算，點右上角「設定」→「分類預算」開始追蹤是否超支。</div>')+
     '</div>';
+
+    if(budgetCategories.length){
+      html += '<div class="section-card">'+
+        '<div class="section-card-head">分類預算</div>'+
+        budgetCategories.map(c => {
+          const spent = curEntries.filter(e=>(e.flow||'expense')!=='income' && (e.category||'').trim()===c.category.trim())
+            .reduce((s,e)=>s+(Number(e.amount)||0),0);
+          const cOver = spent > (Number(c.amount)||0);
+          const cPct = c.amount>0 ? Math.min(100, spent/c.amount*100) : 0;
+          return '<div class="cat-budget-row">'+
+            '<div class="cat-budget-top"><span>'+esc(c.category)+'</span><span class="mono '+(cOver?'over-text':'')+'">$'+fmt(spent)+' / $'+fmt(c.amount)+'</span></div>'+
+            '<div class="summary-bar cat-budget-bar"><div class="summary-bar-fill'+(cOver?' over':'')+'" style="width:'+cPct+'%"></div></div>'+
+          '</div>';
+        }).join('')+
+      '</div>';
+    }
 
     if(state.showStats){
       html += '<div class="section-card">'+
@@ -694,6 +730,7 @@ const App = (function(){
   function renderEntry(mk, e){
     const flow = e.flow || 'expense';
     const payMethod = e.payMethod || '現金';
+    const payLabel = payMethod + (payMethod!=='現金' && e.payMethodDetail ? '・'+esc(e.payMethodDetail) : '');
     return '<div class="entry-row'+(e.recurringId?' is-recurring':'')+'">'+
       '<div class="entry-top">'+
         (e.recurringId ? '<span class="recurring-badge" title="固定支出自動產生">固定</span>' : '')+
@@ -705,15 +742,17 @@ const App = (function(){
       '<div class="entry-mid">'+
         '<button type="button" class="flow-pill '+flow+'" title="點一下切換收入/支出" onclick="App.toggleFlow(\''+mk+'\',\''+e.id+'\')">'+(flow==='income'?'收入':'支出')+'</button>'+
         '<select class="pay-method" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethod\',this.value)">'+
-          ['現金','刷卡','電子支付'].map(p=>'<option '+(p===payMethod?'selected':'')+'>'+p+'</option>').join('')+
+          ['現金','刷卡','電子支付','轉帳'].map(p=>'<option '+(p===payMethod?'selected':'')+'>'+p+'</option>').join('')+
         '</select>'+
         (payMethod!=='現金' ? '<input type="text" class="pay-detail" placeholder="'+(payMethod==='刷卡'?'卡片名稱':'支付方式名稱')+'" value="'+esc(e.payMethodDetail||'')+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethodDetail\',this.value)">' : '')+
       '</div>'+
-      '<div class="entry-bottom">'+
-        '<button type="button" class="payer-pill'+(e.payer?' is-set':'')+'" title="點一下切換付款者" onclick="App.cyclePayer(\''+mk+'\',\''+e.id+'\')">'+(e.payer||'付款者')+'</button>'+
-        '<input type="number" class="amount-input mono '+(flow==='income'?'is-income':'')+'" value="'+e.amount+'" placeholder="金額" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'amount\',this.value)">'+
-        (e.image ? '<img class="receipt-thumb" src="'+e.image+'" onclick="App.openLightbox(\''+mk+'\',\''+e.id+'\')">' :
-          '<label class="receipt-add">＋<input type="file" accept="image/*" style="display:none" onchange="App.handleEntryImage(event,\''+mk+'\',\''+e.id+'\')"></label>')+
+      '<div class="entry-pay-row'+(flow==='expense'?' pay-highlight':'')+'">'+
+        '<span class="pay-label">'+esc(payLabel)+'</span>'+
+        '<div class="entry-pay-right">'+
+          '<input type="number" class="amount-input mono '+(flow==='income'?'is-income':'')+'" value="'+e.amount+'" placeholder="金額" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'amount\',this.value)">'+
+          (e.image ? '<img class="receipt-thumb" src="'+e.image+'" onclick="App.openLightbox(\''+mk+'\',\''+e.id+'\')">' :
+            '<label class="receipt-add">＋<input type="file" accept="image/*" style="display:none" onchange="App.handleEntryImage(event,\''+mk+'\',\''+e.id+'\')"></label>')+
+        '</div>'+
       '</div>'+
     '</div>';
   }
@@ -722,7 +761,7 @@ const App = (function(){
     const {mk, entryId} = lightboxCtx;
     const entry = (state.entriesByMonth[mk]||[]).find(e=>e.id===entryId);
     if(!entry || !entry.image) return '';
-    return '<div class="overlay" onclick="App.closeLightbox()"><div class="lightbox" onclick="event.stopPropagation()">'+
+    return '<div class="overlay"><div class="lightbox" onclick="event.stopPropagation()">'+
       '<img src="'+entry.image+'"><div class="lb-actions">'+
       '<button class="btn btn-outline btn-sm" style="background:rgba(255,255,255,.9);" onclick="App.deleteLightboxImage()">刪除照片</button>'+
       '<button class="btn btn-ghost btn-sm" onclick="App.closeLightbox()">關閉 ✕</button>'+
@@ -732,20 +771,43 @@ const App = (function(){
   function renderModal(){
     const m = state.modal;
     if(!m) return '';
+    if(m.type==='settings-menu'){
+      const syncCode = getSyncCode();
+      return '<div class="overlay"><div class="modal" onclick="event.stopPropagation()">'+
+        '<div class="modal-head-row"><h3>設定</h3><button class="icon-btn" title="關閉" onclick="App.closeModal()">✕</button></div>'+
+        '<div class="settings-menu-list">'+
+          '<button class="settings-menu-item" onclick="App.openBudgetModal()"><span>分類預算</span><span class="settings-menu-sub">設定每個分類的每月預算</span></button>'+
+          '<button class="settings-menu-item" onclick="App.openRecurringModal()"><span>固定支出</span><span class="settings-menu-sub">房租、訂閱等每月自動出現的花費</span></button>'+
+          '<button class="settings-menu-item" onclick="App.openCardSettingsModal()"><span>信用卡結帳日</span><span class="settings-menu-sub">設定每張卡的帳單週期</span></button>'+
+          '<button class="settings-menu-item" onclick="App.openSyncModal()"><span>雲端同步</span><span class="settings-menu-sub">'+(syncCode?'目前已套用同步碼':'目前只存在這台裝置')+'</span></button>'+
+        '</div>'+
+        '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">關閉</button></div>'+
+      '</div></div>';
+    }
     if(m.type==='budget'){
-      return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
-        '<h3>設定每月預算</h3>'+
-        '<p class="lead">設定一個每月花費目標，之後每個月都會用這個金額比對是否超支（可以隨時修改）。</p>'+
-        '<div class="field"><label>每月預算</label><input id="f-budget" type="number" value="'+(state.budget||0)+'" placeholder="例如 20000"></div>'+
+      const draft = m.draft || [];
+      const total = draft.reduce((s,c)=>s+(Number(c.amount)||0),0);
+      return '<div class="overlay"><div class="modal" onclick="event.stopPropagation()">'+
+        '<div class="modal-head-row"><h3>分類預算</h3><button class="icon-btn" title="關閉" onclick="App.closeModal()">✕</button></div>'+
+        '<p class="lead">依分類設定每月預算目標（例：餐飲 8000、交通 1500），加總就是本月的總預算。</p>'+
+        (draft.length ? draft.map((c,i)=>
+          '<div class="card-setting-row">'+
+            '<input type="text" list="cat-list" placeholder="分類" value="'+esc(c.category)+'" onchange="App.updateBudgetDraft('+i+',\'category\',this.value)">'+
+            '<input type="number" class="mono" placeholder="每月預算" value="'+c.amount+'" onchange="App.updateBudgetDraft('+i+',\'amount\',this.value)">'+
+            '<button class="icon-btn" title="刪除" onclick="App.removeBudgetRow('+i+')">✕</button>'+
+          '</div>'
+        ).join('') : '<div class="template-box">還沒有分類預算，點下面「+ 新增分類預算」開始設定。</div>')+
+        '<button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="App.addBudgetRow()">+ 新增分類預算</button>'+
+        '<div class="template-box" style="margin-top:14px;">目前分類預算合計：<b class="mono">$'+fmt(total)+'</b>／月</div>'+
         '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
-        '<button class="btn btn-amber" onclick="App.submitBudget()">儲存</button></div>'+
+        '<button class="btn btn-amber" onclick="App.submitBudgetCategories()">儲存</button></div>'+
       '</div></div>';
     }
     if(m.type==='sync'){
       const code = getSyncCode();
       const cloudOk = !!window.__cloudReady;
-      return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
-        '<h3>雲端同步</h3>'+
+      return '<div class="overlay"><div class="modal" onclick="event.stopPropagation()">'+
+        '<div class="modal-head-row"><h3>雲端同步</h3><button class="icon-btn" title="關閉" onclick="App.closeModal()">✕</button></div>'+
         '<p class="lead">設定一組同步碼，在其他裝置輸入同樣的碼，就能讀到同一份日常帳資料。這組跟行程網站是分開的，不會共用。</p>'+
         (!cloudOk ? '<div class="template-box">目前還沒有連上雲端資料庫，資料只會存在這台裝置。</div>' : '')+
         '<div class="field"><label>同步碼</label><input id="f-sync-code" type="text" value="'+esc(code)+'" placeholder="自己設一組英數字"></div>'+
@@ -756,8 +818,8 @@ const App = (function(){
     }
     if(m.type==='card-settings'){
       const draft = m.draft || [];
-      return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
-        '<h3>信用卡結帳日</h3>'+
+      return '<div class="overlay"><div class="modal" onclick="event.stopPropagation()">'+
+        '<div class="modal-head-row"><h3>信用卡結帳日</h3><button class="icon-btn" title="關閉" onclick="App.closeModal()">✕</button></div>'+
         '<p class="lead">設定每張卡的結帳日（1-31），「這期刷卡預估」就會照真正的帳單週期計算，而不是日曆月。</p>'+
         (draft.length ? draft.map((c,i)=>
           '<div class="card-setting-row">'+
@@ -773,8 +835,8 @@ const App = (function(){
     }
     if(m.type==='recurring'){
       const draft = m.draft || [];
-      return '<div class="overlay" onclick="App.closeModal()"><div class="modal modal-wide" onclick="event.stopPropagation()">'+
-        '<h3>固定支出</h3>'+
+      return '<div class="overlay"><div class="modal modal-wide" onclick="event.stopPropagation()">'+
+        '<div class="modal-head-row"><h3>固定支出</h3><button class="icon-btn" title="關閉" onclick="App.closeModal()">✕</button></div>'+
         '<p class="lead">設定每月會自動出現的固定花費（房租、訂閱、分期等）。「結束月份」留空代表沒有期限，會一直套用下去；分期這種有到期的，填結束月份就會自動停止。</p>'+
         (draft.length ? draft.map((t,i)=>'<div class="recurring-row">'+
             '<div class="recurring-row-head"><span>固定支出 '+(i+1)+'</span>'+
@@ -789,7 +851,7 @@ const App = (function(){
             '</div>'+
             '<div class="recurring-row-line">'+
               '<div class="recurring-field"><label>支付方式</label><select onchange="App.updateRecurringDraft('+i+',\'payMethod\',this.value)">'+
-                ['現金','刷卡','電子支付'].map(p=>'<option '+(p===t.payMethod?'selected':'')+'>'+p+'</option>').join('')+
+                ['現金','刷卡','電子支付','轉帳'].map(p=>'<option '+(p===t.payMethod?'selected':'')+'>'+p+'</option>').join('')+
               '</select></div>'+
               (t.payMethod!=='現金' ? '<div class="recurring-field"><label>卡片／支付方式名稱</label><input type="text" placeholder="例：國泰現金回饋卡" value="'+esc(t.payMethodDetail||'')+'" onchange="App.updateRecurringDraft('+i+',\'payMethodDetail\',this.value)"></div>' : '')+
             '</div>'+
@@ -808,8 +870,9 @@ const App = (function(){
   }
 
   return {
-    init, toggleMonth, openBudgetModal, submitBudget, closeModal,
-    addEntry, updateEntryField, updateEntryDate, cyclePayer, toggleFlow, handleEntryImage, deleteEntry,
+    init, toggleMonth, openSettingsMenu, closeModal,
+    openBudgetModal, addBudgetRow, updateBudgetDraft, removeBudgetRow, submitBudgetCategories,
+    addEntry, updateEntryField, updateEntryDate, toggleFlow, handleEntryImage, deleteEntry,
     openCardSettingsModal, addCardSettingRow, updateCardSettingDraft, removeCardSettingRow, submitCardSettings,
     openRecurringModal, addRecurringRow, updateRecurringDraft, removeRecurringRow, submitRecurring, applyRecurringForMonthUI, toggleStats,
     openLightbox, closeLightbox, deleteLightboxImage,
