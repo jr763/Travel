@@ -129,7 +129,8 @@
 
   .entry-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:12px 14px;margin-top:10px;}
   .entry-row.is-recurring{border-left:3px solid var(--sky);}
-  .recurring-badge{font-size:13px;flex:none;}
+  .recurring-badge{font-size:10.5px;font-weight:700;color:var(--sky);border:1px solid var(--sky);border-radius:4px;
+    padding:2px 5px;flex:none;letter-spacing:.02em;}
   .entry-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .entry-top input[type=date]{width:132px;font-size:12.5px;padding:7px 8px;}
   .entry-top .cat-input{width:96px;font-size:12.5px;padding:7px 8px;}
@@ -170,12 +171,15 @@
   .card-setting-row input[type=number]{width:70px;}
 
   .modal-wide{max-width:520px;}
-  .recurring-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:10px;}
-  .recurring-row-line{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  .recurring-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px;}
+  .recurring-row-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;
+    font-size:11.5px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .recurring-row-line{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
   .recurring-row-line:last-child{margin-bottom:0;}
-  .recurring-row-line input,.recurring-row-line select{flex:1;min-width:80px;font-size:12.5px;padding:7px 8px;}
-  .recurring-mini-label{flex:1;min-width:140px;font-size:10.5px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.03em;}
-  .recurring-mini-label input{width:100%;margin-top:4px;font-size:12.5px;padding:7px 8px;}
+  .recurring-field{flex:1;min-width:140px;}
+  .recurring-field label{display:block;font-size:10.5px;font-weight:700;color:var(--text-soft);margin-bottom:5px;
+    text-transform:uppercase;letter-spacing:.03em;}
+  .recurring-field input,.recurring-field select{width:100%;font-size:12.5px;padding:7px 8px;}
 
   .overlay{position:fixed;inset:0;background:rgba(58,50,41,.55);backdrop-filter:blur(2px);display:flex;align-items:center;
     justify-content:center;padding:20px;z-index:50;}
@@ -584,10 +588,10 @@ const App = (function(){
   function render(){
     const syncCode = getSyncCode();
     document.getElementById('topbar-actions').innerHTML =
-      '<button class="btn btn-ghost" onclick="App.openSyncModal()">'+(syncCode?'☁ 已同步':'☁ 雲端同步')+'</button>'+
-      '<button class="btn btn-ghost'+(state.showStats?' is-active':'')+'" onclick="App.toggleStats()">📊 統計</button>'+
-      '<button class="btn btn-ghost" onclick="App.openRecurringModal()">🔁 固定支出</button>'+
-      '<button class="btn btn-ghost" onclick="App.openBudgetModal()">⚙ 設定預算</button>'+
+      '<button class="btn btn-ghost" onclick="App.openSyncModal()">'+(syncCode?'已同步':'雲端同步')+'</button>'+
+      '<button class="btn btn-ghost'+(state.showStats?' is-active':'')+'" onclick="App.toggleStats()">統計</button>'+
+      '<button class="btn btn-ghost" onclick="App.openRecurringModal()">固定支出</button>'+
+      '<button class="btn btn-ghost" onclick="App.openBudgetModal()">設定預算</button>'+
       '<button class="btn btn-amber" onclick="App.addEntry()">+ 新增花費</button>';
 
     const curMk = currentMonthKey();
@@ -605,15 +609,15 @@ const App = (function(){
       (budget>0 ? (
         '<div class="summary-bar"><div class="summary-bar-fill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>'+
         '<div class="summary-row"><span>本月預算</span><b class="mono">$'+fmt(budget)+'</b></div>'+
-        '<div class="summary-status '+(over?'over':'under')+'">'+(over?'⚠️ 已超出預算 $'+fmt(curExpense-budget):'✓ 還剩 $'+fmt(budget-curExpense))+'</div>'
+        '<div class="summary-status '+(over?'over':'under')+'">'+(over?'已超出預算 $'+fmt(curExpense-budget):'還剩 $'+fmt(budget-curExpense))+'</div>'
       ) : '<div class="no-budget-hint">還沒有設定預算，點右上角「設定預算」開始追蹤是否超支。</div>')+
     '</div>';
 
     if(state.showStats){
       html += '<div class="section-card">'+
-        '<div class="section-card-head">📊 支出趨勢（近 12 個月'+(budget>0?'，虛線為預算':'')+'）</div>'+
+        '<div class="section-card-head">支出趨勢（近 12 個月'+(budget>0?'，虛線為預算':'')+'）</div>'+
         '<div class="chart-box"><canvas id="trend-chart"></canvas></div>'+
-        '<div class="section-card-head" style="margin-top:22px;">🥧 '+monthLabel(curMk)+'：固定 vs 變動支出</div>'+
+        '<div class="section-card-head" style="margin-top:22px;">'+monthLabel(curMk)+'：固定 vs 變動支出</div>'+
         '<div class="chart-box chart-box-pie"><canvas id="pie-chart"></canvas></div>'+
       '</div>';
     }
@@ -648,7 +652,7 @@ const App = (function(){
       });
       const cardGrand = rows.reduce((s,r)=>s+r.sum,0);
       html += '<div class="card-summary">'+
-        '<div class="card-summary-head-row"><span class="card-summary-head">💳 這期刷卡預估</span>'+
+        '<div class="card-summary-head-row"><span class="card-summary-head">這期刷卡預估</span>'+
           '<button class="btn btn-outline btn-sm" onclick="App.openCardSettingsModal()">設定結帳日</button></div>'+
         rows.map(r=>'<div class="card-summary-row"><span>'+esc(r.name)+'<span class="card-range">'+esc(r.rangeLabel)+'</span></span><b class="mono">$'+fmt(r.sum)+'</b></div>').join('')+
         '<div class="card-summary-row card-summary-total"><span>合計</span><b class="mono">$'+fmt(cardGrand)+'</b></div>'+
@@ -670,10 +674,10 @@ const App = (function(){
               '<span class="month-title">'+monthLabel(mk)+'</span>'+
               '<span class="month-meta">'+entries.length+' 筆</span></div>'+
             '<div class="month-amounts'+(budget>0?(mOver?' over':' under'):'')+'">$'+fmt(expenseTotal)+
-              (budget>0?(mOver?' ⚠️':' ✓'):'')+(incomeTotal>0?' <span style="color:#8FA888;">(+$'+fmt(incomeTotal)+')</span>':'')+'</div>'+
+              (incomeTotal>0?' <span style="color:#8FA888;">(+$'+fmt(incomeTotal)+')</span>':'')+'</div>'+
           '</div>'+
           '<div class="month-body'+(expanded?'':' is-collapsed')+'">'+
-            '<button class="btn btn-outline btn-sm" style="margin-bottom:10px;" onclick="App.applyRecurringForMonthUI(\''+mk+'\')">🔁 套用固定支出到這個月</button>'+
+            '<button class="btn btn-outline btn-sm" style="margin-bottom:10px;" onclick="App.applyRecurringForMonthUI(\''+mk+'\')">套用固定支出到這個月</button>'+
             (entries.length ? entries.map(e=>renderEntry(mk,e)).join('') : '<div class="empty-hint">這個月還沒有紀錄。</div>')+
           '</div>'+
         '</div>';
@@ -692,7 +696,7 @@ const App = (function(){
     const payMethod = e.payMethod || '現金';
     return '<div class="entry-row'+(e.recurringId?' is-recurring':'')+'">'+
       '<div class="entry-top">'+
-        (e.recurringId ? '<span class="recurring-badge" title="固定支出自動產生">🔁</span>' : '')+
+        (e.recurringId ? '<span class="recurring-badge" title="固定支出自動產生">固定</span>' : '')+
         '<input type="date" value="'+esc(e.date)+'" onchange="App.updateEntryDate(\''+mk+'\',\''+e.id+'\',this.value)">'+
         '<input type="text" list="cat-list" class="cat-input" placeholder="分類" value="'+esc(e.category)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'category\',this.value)">'+
         '<input type="text" class="desc" placeholder="說明" value="'+esc(e.description)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'description\',this.value)">'+
@@ -743,9 +747,9 @@ const App = (function(){
       return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
         '<h3>雲端同步</h3>'+
         '<p class="lead">設定一組同步碼，在其他裝置輸入同樣的碼，就能讀到同一份日常帳資料。這組跟行程網站是分開的，不會共用。</p>'+
-        (!cloudOk ? '<div class="template-box">⚠️ 目前還沒有連上雲端資料庫，資料只會存在這台裝置。</div>' : '')+
+        (!cloudOk ? '<div class="template-box">目前還沒有連上雲端資料庫，資料只會存在這台裝置。</div>' : '')+
         '<div class="field"><label>同步碼</label><input id="f-sync-code" type="text" value="'+esc(code)+'" placeholder="自己設一組英數字"></div>'+
-        '<div class="template-box">⚠️ 這組碼沒有帳號密碼保護，請不要用容易被猜到的字，也不要公開分享。</div>'+
+        '<div class="template-box">這組碼沒有帳號密碼保護，請不要用容易被猜到的字，也不要公開分享。</div>'+
         '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
         '<button class="btn btn-amber" onclick="App.submitSyncCode()">儲存並套用</button></div>'+
       '</div></div>';
@@ -773,25 +777,28 @@ const App = (function(){
         '<h3>固定支出</h3>'+
         '<p class="lead">設定每月會自動出現的固定花費（房租、訂閱、分期等）。「結束月份」留空代表沒有期限，會一直套用下去；分期這種有到期的，填結束月份就會自動停止。</p>'+
         (draft.length ? draft.map((t,i)=>'<div class="recurring-row">'+
+            '<div class="recurring-row-head"><span>固定支出 '+(i+1)+'</span>'+
+              '<button class="icon-btn" title="刪除這筆固定支出" onclick="App.removeRecurringRow('+i+')">✕</button></div>'+
             '<div class="recurring-row-line">'+
-              '<input type="text" placeholder="名稱（例：房租）" value="'+esc(t.name)+'" onchange="App.updateRecurringDraft('+i+',\'name\',this.value)">'+
-              '<input type="text" list="cat-list" placeholder="分類" value="'+esc(t.category)+'" onchange="App.updateRecurringDraft('+i+',\'category\',this.value)">'+
-              '<button class="icon-btn" title="刪除" onclick="App.removeRecurringRow('+i+')">✕</button>'+
+              '<div class="recurring-field"><label>名稱</label><input type="text" placeholder="例：房租" value="'+esc(t.name)+'" onchange="App.updateRecurringDraft('+i+',\'name\',this.value)"></div>'+
+              '<div class="recurring-field"><label>分類</label><input type="text" list="cat-list" placeholder="例：房租" value="'+esc(t.category)+'" onchange="App.updateRecurringDraft('+i+',\'category\',this.value)"></div>'+
             '</div>'+
             '<div class="recurring-row-line">'+
-              '<input type="number" class="mono" placeholder="金額" value="'+t.amount+'" onchange="App.updateRecurringDraft('+i+',\'amount\',this.value)">'+
-              '<input type="number" min="1" max="28" placeholder="每月幾號" title="每月幾號扣款" value="'+t.dayOfMonth+'" onchange="App.updateRecurringDraft('+i+',\'dayOfMonth\',this.value)">'+
-              '<select onchange="App.updateRecurringDraft('+i+',\'payMethod\',this.value)">'+
+              '<div class="recurring-field"><label>每月金額</label><input type="number" class="mono" placeholder="0" value="'+t.amount+'" onchange="App.updateRecurringDraft('+i+',\'amount\',this.value)"></div>'+
+              '<div class="recurring-field"><label>每月幾號扣款</label><input type="number" min="1" max="28" placeholder="1-28" value="'+t.dayOfMonth+'" onchange="App.updateRecurringDraft('+i+',\'dayOfMonth\',this.value)"></div>'+
+            '</div>'+
+            '<div class="recurring-row-line">'+
+              '<div class="recurring-field"><label>支付方式</label><select onchange="App.updateRecurringDraft('+i+',\'payMethod\',this.value)">'+
                 ['現金','刷卡','電子支付'].map(p=>'<option '+(p===t.payMethod?'selected':'')+'>'+p+'</option>').join('')+
-              '</select>'+
+              '</select></div>'+
+              (t.payMethod!=='現金' ? '<div class="recurring-field"><label>卡片／支付方式名稱</label><input type="text" placeholder="例：國泰現金回饋卡" value="'+esc(t.payMethodDetail||'')+'" onchange="App.updateRecurringDraft('+i+',\'payMethodDetail\',this.value)"></div>' : '')+
             '</div>'+
-            (t.payMethod!=='現金' ? '<div class="recurring-row-line"><input type="text" placeholder="卡片/支付方式名稱" value="'+esc(t.payMethodDetail||'')+'" onchange="App.updateRecurringDraft('+i+',\'payMethodDetail\',this.value)"></div>' : '')+
             '<div class="recurring-row-line">'+
-              '<label class="recurring-mini-label">開始<input type="month" value="'+esc(t.startMonth||'')+'" onchange="App.updateRecurringDraft('+i+',\'startMonth\',this.value)"></label>'+
-              '<label class="recurring-mini-label">結束（留空＝沒有期限）<input type="month" value="'+esc(t.endMonth||'')+'" onchange="App.updateRecurringDraft('+i+',\'endMonth\',this.value)"></label>'+
+              '<div class="recurring-field"><label>開始月份</label><input type="month" value="'+esc(t.startMonth||'')+'" onchange="App.updateRecurringDraft('+i+',\'startMonth\',this.value)"></div>'+
+              '<div class="recurring-field"><label>結束月份（留空＝沒有期限）</label><input type="month" value="'+esc(t.endMonth||'')+'" onchange="App.updateRecurringDraft('+i+',\'endMonth\',this.value)"></div>'+
             '</div>'+
           '</div>'
-        ).join('') : '<div class="template-box">還沒有固定支出，點下面「+ 新增固定支出」開始設定。</div>')+
+        ).join('') : '<div class="template-box">還沒有固定支出，點下面「新增固定支出」開始設定。</div>')+
         '<button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="App.addRecurringRow()">+ 新增固定支出</button>'+
         '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
         '<button class="btn btn-amber" onclick="App.submitRecurring()">儲存並套用到本月</button></div>'+
