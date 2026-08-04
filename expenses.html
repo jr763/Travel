@@ -610,7 +610,7 @@ const App = (function(){
   function render(){
     document.getElementById('topbar-actions').innerHTML =
       '<button class="btn btn-ghost'+(state.showStats?' is-active':'')+'" onclick="App.toggleStats()">統計</button>'+
-      '<button class="btn btn-outline" onclick="App.openSettingsMenu()">設定</button>'+
+      '<button class="btn btn-ghost" onclick="App.openSettingsMenu()">設定</button>'+
       '<button class="btn btn-amber" onclick="App.addEntry()">+ 新增花費</button>';
 
     const curMk = currentMonthKey();
