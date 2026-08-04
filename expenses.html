@@ -735,9 +735,10 @@ const App = (function(){
 
     // Credit-card breakdown: real billing cycle if a closing day is set for the card, else calendar month.
     const allEntries = allLoadedEntries();
+    const isCardPay = e => ['刷卡','電子支付'].includes(e.payMethod||'');
     const cardNamesFromEntries = {};
     curEntries.forEach(e => {
-      if((e.flow||'expense')!=='income' && (e.payMethod||'')==='刷卡'){
+      if((e.flow||'expense')!=='income' && isCardPay(e)){
         cardNamesFromEntries[(e.payMethodDetail||'').trim() || '未命名卡片'] = true;
       }
     });
@@ -749,12 +750,12 @@ const App = (function(){
         let sum = 0, rangeLabel = '';
         if(setting && setting.closingDay){
           const range = cardCycleRange(setting.closingDay);
-          sum = allEntries.filter(e => (e.flow||'expense')!=='income' && (e.payMethod||'')==='刷卡' &&
+          sum = allEntries.filter(e => (e.flow||'expense')!=='income' && isCardPay(e) &&
             ((e.payMethodDetail||'').trim()||'未命名卡片')===name && e.date>=range.start && e.date<=range.end)
             .reduce((s,e)=>s+(Number(e.amount)||0),0);
           rangeLabel = range.start+' ~ '+range.end;
         } else {
-          sum = curEntries.filter(e => (e.flow||'expense')!=='income' && (e.payMethod||'')==='刷卡' &&
+          sum = curEntries.filter(e => (e.flow||'expense')!=='income' && isCardPay(e) &&
             ((e.payMethodDetail||'').trim()||'未命名卡片')===name)
             .reduce((s,e)=>s+(Number(e.amount)||0),0);
           rangeLabel = '本日曆月（尚未設定結帳日）';
@@ -763,7 +764,7 @@ const App = (function(){
       });
       const cardGrand = rows.reduce((s,r)=>s+r.sum,0);
       html += '<div class="card-summary">'+
-        '<div class="card-summary-head-row"><span class="card-summary-head">這期刷卡預估</span>'+
+        '<div class="card-summary-head-row"><span class="card-summary-head">這期刷卡／電子支付預估</span>'+
           '<button class="btn btn-outline btn-sm" onclick="App.openCardSettingsModal()">設定結帳日</button></div>'+
         rows.map(r=>'<div class="card-summary-row"><span>'+esc(r.name)+'<span class="card-range">'+esc(r.rangeLabel)+'</span></span><b class="mono">$'+fmt(r.sum)+'</b></div>').join('')+
         '<div class="card-summary-row card-summary-total"><span>合計</span><b class="mono">$'+fmt(cardGrand)+'</b></div>'+
