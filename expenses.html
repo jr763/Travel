@@ -869,7 +869,7 @@ const App = (function(){
               '<button class="icon-btn" title="刪除這筆固定支出" onclick="App.removeRecurringRow('+i+')">✕</button></div>'+
             '<div class="recurring-row-line">'+
               '<div class="recurring-field"><label>名稱</label><input type="text" placeholder="例：房租" value="'+esc(t.name)+'" onchange="App.updateRecurringDraft('+i+',\'name\',this.value)"></div>'+
-              '<div class="recurring-field"><label>分類</label><input type="text" list="cat-list" placeholder="例：房租" value="'+esc(t.category)+'" onchange="App.updateRecurringDraft('+i+',\'category\',this.value)"></div>'+
+              '<div class="recurring-field"><label>分類（可自行輸入）</label><input type="text" list="cat-list" placeholder="例：居住／訂閱／交通" value="'+esc(t.category)+'" onchange="App.updateRecurringDraft('+i+',\'category\',this.value)"></div>'+
             '</div>'+
             '<div class="recurring-row-line">'+
               '<div class="recurring-field"><label>每月金額</label><input type="number" class="mono" placeholder="0" value="'+t.amount+'" onchange="App.updateRecurringDraft('+i+',\'amount\',this.value)"></div>'+
