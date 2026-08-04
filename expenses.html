@@ -129,18 +129,36 @@
   .entry-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:12px 14px;margin-top:10px;}
   .entry-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .entry-top input[type=date]{width:132px;font-size:12.5px;padding:7px 8px;}
-  .entry-top select{width:96px;font-size:12.5px;padding:7px 8px;}
+  .entry-top .cat-input{width:96px;font-size:12.5px;padding:7px 8px;}
   .entry-top input.desc{flex:1;min-width:120px;font-size:13px;padding:7px 9px;}
+  .entry-mid{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .entry-mid .pay-method{width:100px;font-size:12px;padding:6px 8px;}
+  .entry-mid .pay-detail{flex:1;min-width:100px;font-size:12px;padding:6px 8px;}
+  .flow-pill{font-family:'Inter',sans-serif;font-size:11px;font-weight:700;padding:6px 10px;border-radius:20px;
+    border:1px solid var(--line);cursor:pointer;flex:none;background:var(--paper);color:var(--text-soft);}
+  .flow-pill.expense{border-color:var(--clay);color:var(--clay);}
+  .flow-pill.income{border-color:var(--teal);background:var(--teal);color:#fff;}
   .entry-bottom{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
   .payer-pill{font-family:'Inter',sans-serif;font-size:11px;font-weight:700;padding:6px 9px;border-radius:20px;
     border:1px dashed var(--line);background:var(--paper);color:var(--text-soft);cursor:pointer;flex:none;}
   .payer-pill:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
   .payer-pill.is-set{border-style:solid;border-color:var(--amber-deep);background:var(--amber);color:var(--ink);}
   .amount-input{width:100px;font-weight:600;}
+  .amount-input.is-income{color:var(--teal);}
   .receipt-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line);}
   .receipt-add{width:40px;height:40px;border-radius:6px;border:1.5px dashed var(--line);display:flex;align-items:center;
     justify-content:center;cursor:pointer;color:var(--text-soft);font-size:16px;background:var(--paper);flex:none;}
   .receipt-add:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
+
+  .card-summary{background:var(--paper);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px;box-shadow:var(--shadow-card);}
+  .card-summary-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;}
+  .card-summary-head{font-size:12px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .card-summary-row{display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0;color:var(--text);}
+  .card-summary-row .card-range{display:block;font-size:11px;color:var(--text-soft);font-weight:400;margin-top:2px;}
+  .card-summary-total{border-top:1.5px dashed var(--line);margin-top:6px;padding-top:10px;font-weight:700;}
+  .card-setting-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .card-setting-row input[type=text]{flex:1;}
+  .card-setting-row input[type=number]{width:70px;}
 
   .overlay{position:fixed;inset:0;background:rgba(58,50,41,.55);backdrop-filter:blur(2px);display:flex;align-items:center;
     justify-content:center;padding:20px;z-index:50;}
@@ -165,7 +183,8 @@
     #topbar{padding:14px 16px;}
     #view{padding:22px 14px 90px;}
     .summary-card{padding:20px 20px;}
-    .entry-top input[type=date],.entry-top select{width:auto;flex:1;min-width:90px;}
+    .entry-top input[type=date],.entry-top .cat-input{width:auto;flex:1;min-width:90px;}
+    .entry-mid .pay-method,.entry-mid .pay-detail{width:auto;flex:1;min-width:90px;}
   }
 </style>
 </head>
@@ -175,12 +194,18 @@
   <div class="actions-row" id="topbar-actions"></div>
 </div>
 <div id="view"></div>
+<datalist id="cat-list">
+  <option value="薪水"><option value="房租"><option value="房屋補助"><option value="健身房">
+  <option value="手機費"><option value="訂閱"><option value="油費"><option value="分期">
+  <option value="儲蓄"><option value="餐費"><option value="水電"><option value="交通">
+  <option value="購物"><option value="娛樂"><option value="醫療"><option value="其他">
+</datalist>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
 
 <script>
 const App = (function(){
-  const state = { budget: 0, monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null };
+  const state = { budget: 0, cardSettings: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
@@ -261,8 +286,14 @@ const App = (function(){
   }
 
   // ---------- Init ----------
+  function shiftMonthKey(mk, delta){
+    const [y,m] = mk.split('-').map(Number);
+    const d = new Date(y, m-1+delta, 1);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  }
   async function init(){
     state.budget = (await load('budget')) || 0;
+    state.cardSettings = (await load('card-settings')) || [];
     state.monthsIndex = (await load('months-index')) || [];
     const cur = currentMonthKey();
     if(state.monthsIndex.indexOf(cur) === -1){
@@ -271,8 +302,28 @@ const App = (function(){
       await save('months-index', state.monthsIndex);
     }
     state.expandedMonths[cur] = true;
+    // Load the previous/next month too (not shown expanded) so credit-card
+    // billing cycles that cross a calendar-month boundary total correctly.
     await loadMonthEntries(cur);
+    await loadMonthEntries(shiftMonthKey(cur, -1));
+    await loadMonthEntries(shiftMonthKey(cur, 1));
     render();
+  }
+  function allLoadedEntries(){
+    let all = [];
+    Object.keys(state.entriesByMonth).forEach(mk => { all = all.concat(state.entriesByMonth[mk]); });
+    return all;
+  }
+  function fmtDateYMD(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function cardCycleRange(closingDay){
+    const today = new Date();
+    let cycleEnd;
+    if(today.getDate() <= closingDay) cycleEnd = new Date(today.getFullYear(), today.getMonth(), closingDay);
+    else cycleEnd = new Date(today.getFullYear(), today.getMonth()+1, closingDay);
+    const cycleStart = new Date(cycleEnd);
+    cycleStart.setMonth(cycleStart.getMonth()-1);
+    cycleStart.setDate(cycleStart.getDate()+1);
+    return { start: fmtDateYMD(cycleStart), end: fmtDateYMD(cycleEnd) };
   }
   async function loadMonthEntries(mk){
     if(state.entriesByMonth[mk]) return;
@@ -294,11 +345,27 @@ const App = (function(){
     render();
   }
 
+  // ---------- Credit card closing-day settings ----------
+  function openCardSettingsModal(){ state.modal = {type:'card-settings', draft: (state.cardSettings||[]).map(c=>({...c}))}; render(); }
+  function addCardSettingRow(){ state.modal.draft.push({name:'', closingDay:1}); render(); }
+  function updateCardSettingDraft(idx, field, value){
+    if(field==='closingDay') value = Math.min(31, Math.max(1, Number(value)||1));
+    state.modal.draft[idx][field] = value;
+  }
+  function removeCardSettingRow(idx){ state.modal.draft.splice(idx,1); render(); }
+  async function submitCardSettings(){
+    const draft = state.modal.draft.filter(c => c.name && c.name.trim());
+    state.cardSettings = draft;
+    await save('card-settings', draft);
+    state.modal = null;
+    render();
+  }
   // ---------- Entries ----------
   async function addEntry(){
     const mk = currentMonthKey();
     await loadMonthEntries(mk);
-    state.entriesByMonth[mk].unshift({ id: uid(), date: todayStr(), category:'其他', description:'', amount:0, payer:'', image:null });
+    state.entriesByMonth[mk].unshift({ id: uid(), date: todayStr(), category:'其他', description:'', amount:0,
+      flow:'expense', payMethod:'現金', payMethodDetail:'', payer:'', image:null });
     await save('entries-'+mk, state.entriesByMonth[mk]);
     state.expandedMonths[mk] = true;
     render();
@@ -310,6 +377,14 @@ const App = (function(){
     if(field==='amount') value = Number(value)||0;
     entry[field] = value;
     await save('entries-'+mk, arr);
+    render();
+  }
+  function toggleFlow(mk, entryId){
+    const arr = state.entriesByMonth[mk];
+    const entry = arr && arr.find(e=>e.id===entryId);
+    if(!entry) return;
+    entry.flow = entry.flow==='income' ? 'expense' : 'income';
+    save('entries-'+mk, arr);
     render();
   }
   async function updateEntryDate(mk, entryId, newDate){
@@ -387,7 +462,7 @@ const App = (function(){
       toast('正在把本機資料同步到雲端...');
       await migrateLocalToCloud(val);
     }
-    state.budget = 0; state.monthsIndex = []; state.entriesByMonth = {}; state.expandedMonths = {};
+    state.budget = 0; state.cardSettings = []; state.monthsIndex = []; state.entriesByMonth = {}; state.expandedMonths = {};
     await init();
     toast(val ? '同步碼已套用' : '已切換回本機模式');
   }
@@ -402,20 +477,60 @@ const App = (function(){
       '<button class="btn btn-amber" onclick="App.addEntry()">+ 新增花費</button>';
 
     const curMk = currentMonthKey();
-    const curTotal = (state.entriesByMonth[curMk]||[]).reduce((s,e)=>s+(Number(e.amount)||0),0);
+    const curEntries = state.entriesByMonth[curMk] || [];
+    const curExpense = curEntries.filter(e=>(e.flow||'expense')!=='income').reduce((s,e)=>s+(Number(e.amount)||0),0);
+    const curIncome = curEntries.filter(e=>e.flow==='income').reduce((s,e)=>s+(Number(e.amount)||0),0);
     const budget = state.budget||0;
-    const over = budget>0 && curTotal>budget;
-    const pct = budget>0 ? Math.min(100, curTotal/budget*100) : 0;
+    const over = budget>0 && curExpense>budget;
+    const pct = budget>0 ? Math.min(100, curExpense/budget*100) : 0;
 
     let html = '<div class="summary-card">'+
       '<h2>'+monthLabel(curMk)+'</h2>'+
-      '<div class="summary-row"><span>本月已花</span><b class="mono">$'+fmt(curTotal)+'</b></div>'+
+      '<div class="summary-row"><span>本月支出</span><b class="mono">$'+fmt(curExpense)+'</b></div>'+
+      (curIncome>0 ? '<div class="summary-row"><span>本月收入</span><b class="mono" style="color:#B9D9B2;">$'+fmt(curIncome)+'</b></div>' : '')+
       (budget>0 ? (
         '<div class="summary-bar"><div class="summary-bar-fill'+(over?' over':'')+'" style="width:'+pct+'%"></div></div>'+
         '<div class="summary-row"><span>本月預算</span><b class="mono">$'+fmt(budget)+'</b></div>'+
-        '<div class="summary-status '+(over?'over':'under')+'">'+(over?'⚠️ 已超出預算 $'+fmt(curTotal-budget):'✓ 還剩 $'+fmt(budget-curTotal))+'</div>'
+        '<div class="summary-status '+(over?'over':'under')+'">'+(over?'⚠️ 已超出預算 $'+fmt(curExpense-budget):'✓ 還剩 $'+fmt(budget-curExpense))+'</div>'
       ) : '<div class="no-budget-hint">還沒有設定預算，點右上角「設定預算」開始追蹤是否超支。</div>')+
     '</div>';
+
+    // Credit-card breakdown: real billing cycle if a closing day is set for the card, else calendar month.
+    const allEntries = allLoadedEntries();
+    const cardNamesFromEntries = {};
+    curEntries.forEach(e => {
+      if((e.flow||'expense')!=='income' && (e.payMethod||'')==='刷卡'){
+        cardNamesFromEntries[(e.payMethodDetail||'').trim() || '未命名卡片'] = true;
+      }
+    });
+    (state.cardSettings||[]).forEach(c => { if(c.name) cardNamesFromEntries[c.name] = true; });
+    const cardNames = Object.keys(cardNamesFromEntries);
+    if(cardNames.length){
+      const rows = cardNames.map(name => {
+        const setting = (state.cardSettings||[]).find(c=>c.name===name);
+        let sum = 0, rangeLabel = '';
+        if(setting && setting.closingDay){
+          const range = cardCycleRange(setting.closingDay);
+          sum = allEntries.filter(e => (e.flow||'expense')!=='income' && (e.payMethod||'')==='刷卡' &&
+            ((e.payMethodDetail||'').trim()||'未命名卡片')===name && e.date>=range.start && e.date<=range.end)
+            .reduce((s,e)=>s+(Number(e.amount)||0),0);
+          rangeLabel = range.start+' ~ '+range.end;
+        } else {
+          sum = curEntries.filter(e => (e.flow||'expense')!=='income' && (e.payMethod||'')==='刷卡' &&
+            ((e.payMethodDetail||'').trim()||'未命名卡片')===name)
+            .reduce((s,e)=>s+(Number(e.amount)||0),0);
+          rangeLabel = '本日曆月（尚未設定結帳日）';
+        }
+        return { name, sum, rangeLabel };
+      });
+      const cardGrand = rows.reduce((s,r)=>s+r.sum,0);
+      html += '<div class="card-summary">'+
+        '<div class="card-summary-head-row"><span class="card-summary-head">💳 這期刷卡預估</span>'+
+          '<button class="btn btn-outline btn-sm" onclick="App.openCardSettingsModal()">設定結帳日</button></div>'+
+        rows.map(r=>'<div class="card-summary-row"><span>'+esc(r.name)+'<span class="card-range">'+esc(r.rangeLabel)+'</span></span><b class="mono">$'+fmt(r.sum)+'</b></div>').join('')+
+        '<div class="card-summary-row card-summary-total"><span>合計</span><b class="mono">$'+fmt(cardGrand)+'</b></div>'+
+      '</div>';
+    }
 
     if(!state.monthsIndex.length){
       html += '<div class="empty-hint">還沒有任何花費紀錄，點右上角「+ 新增花費」開始記帳。</div>';
@@ -423,15 +538,16 @@ const App = (function(){
       state.monthsIndex.forEach(mk => {
         const expanded = !!state.expandedMonths[mk];
         const entries = state.entriesByMonth[mk] || [];
-        const total = entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
-        const mOver = budget>0 && total>budget;
+        const expenseTotal = entries.filter(e=>(e.flow||'expense')!=='income').reduce((s,e)=>s+(Number(e.amount)||0),0);
+        const incomeTotal = entries.filter(e=>e.flow==='income').reduce((s,e)=>s+(Number(e.amount)||0),0);
+        const mOver = budget>0 && expenseTotal>budget;
         html += '<div class="month-block'+(expanded?'':' is-collapsed')+'">'+
           '<div class="month-head" onclick="App.toggleMonth(\''+mk+'\')">'+
             '<div class="month-head-left"><span class="chevron-sm">▾</span>'+
               '<span class="month-title">'+monthLabel(mk)+'</span>'+
               '<span class="month-meta">'+entries.length+' 筆</span></div>'+
-            '<div class="month-amounts'+(budget>0?(mOver?' over':' under'):'')+'">$'+fmt(total)+
-              (budget>0?(mOver?' ⚠️':' ✓'):'')+'</div>'+
+            '<div class="month-amounts'+(budget>0?(mOver?' over':' under'):'')+'">$'+fmt(expenseTotal)+
+              (budget>0?(mOver?' ⚠️':' ✓'):'')+(incomeTotal>0?' <span style="color:#8FA888;">(+$'+fmt(incomeTotal)+')</span>':'')+'</div>'+
           '</div>'+
           '<div class="month-body'+(expanded?'':' is-collapsed')+'">'+
             (entries.length ? entries.map(e=>renderEntry(mk,e)).join('') : '<div class="empty-hint">這個月還沒有紀錄。</div>')+
@@ -447,19 +563,25 @@ const App = (function(){
   }
 
   function renderEntry(mk, e){
-    const cats = ['餐飲','交通','購物','娛樂','居家','醫療','其他'];
+    const flow = e.flow || 'expense';
+    const payMethod = e.payMethod || '現金';
     return '<div class="entry-row">'+
       '<div class="entry-top">'+
         '<input type="date" value="'+esc(e.date)+'" onchange="App.updateEntryDate(\''+mk+'\',\''+e.id+'\',this.value)">'+
-        '<select onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'category\',this.value)">'+
-          cats.map(c=>'<option '+(c===e.category?'selected':'')+'>'+c+'</option>').join('')+
-        '</select>'+
+        '<input type="text" list="cat-list" class="cat-input" placeholder="分類" value="'+esc(e.category)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'category\',this.value)">'+
         '<input type="text" class="desc" placeholder="說明" value="'+esc(e.description)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'description\',this.value)">'+
         '<button class="icon-btn" title="刪除" onclick="App.deleteEntry(\''+mk+'\',\''+e.id+'\')">✕</button>'+
       '</div>'+
+      '<div class="entry-mid">'+
+        '<button type="button" class="flow-pill '+flow+'" title="點一下切換收入/支出" onclick="App.toggleFlow(\''+mk+'\',\''+e.id+'\')">'+(flow==='income'?'收入':'支出')+'</button>'+
+        '<select class="pay-method" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethod\',this.value)">'+
+          ['現金','刷卡','電子支付'].map(p=>'<option '+(p===payMethod?'selected':'')+'>'+p+'</option>').join('')+
+        '</select>'+
+        (payMethod!=='現金' ? '<input type="text" class="pay-detail" placeholder="'+(payMethod==='刷卡'?'卡片名稱':'支付方式名稱')+'" value="'+esc(e.payMethodDetail||'')+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethodDetail\',this.value)">' : '')+
+      '</div>'+
       '<div class="entry-bottom">'+
         '<button type="button" class="payer-pill'+(e.payer?' is-set':'')+'" title="點一下切換付款者" onclick="App.cyclePayer(\''+mk+'\',\''+e.id+'\')">'+(e.payer||'付款者')+'</button>'+
-        '<input type="number" class="amount-input mono" value="'+e.amount+'" placeholder="金額" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'amount\',this.value)">'+
+        '<input type="number" class="amount-input mono '+(flow==='income'?'is-income':'')+'" value="'+e.amount+'" placeholder="金額" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'amount\',this.value)">'+
         (e.image ? '<img class="receipt-thumb" src="'+e.image+'" onclick="App.openLightbox(\''+mk+'\',\''+e.id+'\')">' :
           '<label class="receipt-add">＋<input type="file" accept="image/*" style="display:none" onchange="App.handleEntryImage(event,\''+mk+'\',\''+e.id+'\')"></label>')+
       '</div>'+
@@ -502,12 +624,30 @@ const App = (function(){
         '<button class="btn btn-amber" onclick="App.submitSyncCode()">儲存並套用</button></div>'+
       '</div></div>';
     }
+    if(m.type==='card-settings'){
+      const draft = m.draft || [];
+      return '<div class="overlay" onclick="App.closeModal()"><div class="modal" onclick="event.stopPropagation()">'+
+        '<h3>信用卡結帳日</h3>'+
+        '<p class="lead">設定每張卡的結帳日（1-31），「這期刷卡預估」就會照真正的帳單週期計算，而不是日曆月。</p>'+
+        (draft.length ? draft.map((c,i)=>
+          '<div class="card-setting-row">'+
+            '<input type="text" placeholder="卡片名稱" value="'+esc(c.name)+'" onchange="App.updateCardSettingDraft('+i+',\'name\',this.value)">'+
+            '<input type="number" min="1" max="31" value="'+c.closingDay+'" onchange="App.updateCardSettingDraft('+i+',\'closingDay\',this.value)">'+
+            '<button class="icon-btn" title="刪除" onclick="App.removeCardSettingRow('+i+')">✕</button>'+
+          '</div>'
+        ).join('') : '<div class="template-box">還沒有卡片，點下面「+ 新增卡片」開始設定。</div>')+
+        '<button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="App.addCardSettingRow()">+ 新增卡片</button>'+
+        '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
+        '<button class="btn btn-amber" onclick="App.submitCardSettings()">儲存</button></div>'+
+      '</div></div>';
+    }
     return '';
   }
 
   return {
     init, toggleMonth, openBudgetModal, submitBudget, closeModal,
-    addEntry, updateEntryField, updateEntryDate, cyclePayer, handleEntryImage, deleteEntry,
+    addEntry, updateEntryField, updateEntryDate, cyclePayer, toggleFlow, handleEntryImage, deleteEntry,
+    openCardSettingsModal, addCardSettingRow, updateCardSettingDraft, removeCardSettingRow, submitCardSettings,
     openLightbox, closeLightbox, deleteLightboxImage,
     openSyncModal, submitSyncCode
   };
