@@ -142,25 +142,31 @@
   .empty-hint{color:var(--text-soft);font-size:13px;background:var(--paper-tint);border-radius:var(--radius-md);padding:16px;text-align:center;}
 
   .entry-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:12px 14px;margin-top:10px;}
-  .entry-row.is-recurring{border-left:3px solid var(--sky);}
-  .recurring-badge{font-size:10.5px;font-weight:700;color:var(--sky);border:1px solid var(--sky);border-radius:4px;
-    padding:2px 5px;flex:none;letter-spacing:.02em;}
+  .recurring-badge{font-size:10.5px;font-weight:700;color:var(--ink);background:rgba(232,184,75,.6);
+    border-radius:3px;padding:2px 6px;flex:none;letter-spacing:.02em;}
+  .entry-row.entry-compact{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;flex-wrap:wrap;}
+  .entry-row.entry-compact:hover{background:var(--line-soft);}
+  .entry-compact-date{font-size:11.5px;color:var(--text-soft);flex:none;}
+  .entry-compact-cat{font-size:12px;font-weight:700;color:var(--ink);flex:none;}
+  .entry-compact-desc{font-size:12.5px;color:var(--text-soft);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entry-compact-amt{font-size:13px;font-weight:700;flex:none;margin-left:auto;}
+  .entry-compact-amt.is-expense{color:var(--clay);}
+  .entry-compact-amt.is-income{color:var(--teal);}
   .entry-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .entry-top input[type=date]{width:132px;font-size:12.5px;padding:7px 8px;}
   .entry-top .cat-input{width:96px;font-size:12.5px;padding:7px 8px;}
   .entry-top input.desc{flex:1;min-width:120px;font-size:13px;padding:7px 9px;}
-  .entry-mid{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
-  .entry-mid .pay-method{width:100px;font-size:12px;padding:6px 8px;}
-  .entry-mid .pay-detail{flex:1;min-width:100px;font-size:12px;padding:6px 8px;}
+  .entry-pay-row .pay-method{width:96px;font-size:12px;padding:6px 8px;flex:none;}
+  .entry-pay-row .pay-detail{flex:1;min-width:90px;font-size:12px;padding:6px 8px;}
   .flow-pill{font-family:'Inter',sans-serif;font-size:11px;font-weight:700;padding:6px 10px;border-radius:20px;
     border:1px solid var(--line);cursor:pointer;flex:none;background:var(--paper);color:var(--text-soft);}
   .flow-pill.expense{border-color:var(--clay);color:var(--clay);}
   .flow-pill.income{border-color:var(--teal);background:var(--teal);color:#fff;}
-  .entry-pay-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;
+  .entry-pay-row{display:flex;align-items:center;gap:8px;margin-top:8px;
     flex-wrap:wrap;padding:6px 2px;border-radius:6px;}
   .entry-pay-row.pay-highlight{background:rgba(217,138,147,.4);padding:8px 10px;}
-  .pay-label{font-size:12.5px;font-weight:700;color:var(--text);}
-  .entry-pay-right{display:flex;align-items:center;gap:8px;flex:none;}
+  .entry-pay-row.pay-highlight-income{background:rgba(143,168,136,.35);padding:8px 10px;}
+  .entry-pay-right{display:flex;align-items:center;gap:8px;flex:none;margin-left:auto;}
   .amount-input{width:100px;font-weight:600;}
   .amount-input.is-income{color:var(--teal);}
   .receipt-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--line);}
@@ -222,7 +228,7 @@
     #view{padding:22px 14px 90px;}
     .summary-card{padding:20px 20px;}
     .entry-top input[type=date],.entry-top .cat-input{width:auto;flex:1;min-width:90px;}
-    .entry-mid .pay-method,.entry-mid .pay-detail{width:auto;flex:1;min-width:90px;}
+    .entry-pay-row .pay-method,.entry-pay-row .pay-detail{width:auto;flex:1;min-width:90px;}
   }
 </style>
 </head>
@@ -243,7 +249,7 @@
 
 <script>
 const App = (function(){
-  const state = { budget: 0, budgetCategories: [], cardSettings: [], recurringTemplates: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null, showStats: false };
+  const state = { budget: 0, budgetCategories: [], cardSettings: [], recurringTemplates: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, entryCollapse: {}, modal: null, showStats: false };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
@@ -402,6 +408,16 @@ const App = (function(){
   async function toggleMonth(mk){
     state.expandedMonths[mk] = !state.expandedMonths[mk];
     if(state.expandedMonths[mk]) await loadMonthEntries(mk);
+    render();
+  }
+  function isEntryCollapsed(mk, entryId){
+    const map = state.entryCollapse[mk];
+    if(!map || map[entryId] === undefined) return true; // compact by default
+    return !!map[entryId];
+  }
+  function toggleEntryCollapse(mk, entryId){
+    if(!state.entryCollapse[mk]) state.entryCollapse[mk] = {};
+    state.entryCollapse[mk][entryId] = !isEntryCollapsed(mk, entryId);
     render();
   }
 
@@ -730,24 +746,34 @@ const App = (function(){
   function renderEntry(mk, e){
     const flow = e.flow || 'expense';
     const payMethod = e.payMethod || '現金';
-    const payLabel = payMethod + (payMethod!=='現金' && e.payMethodDetail ? '・'+esc(e.payMethodDetail) : '');
-    return '<div class="entry-row'+(e.recurringId?' is-recurring':'')+'">'+
+    const collapsed = isEntryCollapsed(mk, e.id);
+
+    if(collapsed){
+      return '<div class="entry-row entry-compact" onclick="App.toggleEntryCollapse(\''+mk+'\',\''+e.id+'\')">'+
+        '<span class="chevron-sm">▸</span>'+
+        (e.recurringId ? '<span class="recurring-badge" title="固定支出自動產生">固定</span>' : '')+
+        '<span class="entry-compact-date mono">'+esc((e.date||'').slice(5))+'</span>'+
+        '<span class="entry-compact-cat">'+esc(e.category||'未分類')+'</span>'+
+        '<span class="entry-compact-desc">'+esc(e.description||'（無說明）')+'</span>'+
+        '<span class="entry-compact-amt mono '+(flow==='income'?'is-income':'is-expense')+'">'+(flow==='income'?'+':'－')+'$'+fmt(e.amount)+'</span>'+
+      '</div>';
+    }
+
+    return '<div class="entry-row is-open">'+
       '<div class="entry-top">'+
+        '<span class="chevron-sm" style="cursor:pointer;" onclick="App.toggleEntryCollapse(\''+mk+'\',\''+e.id+'\')">▾</span>'+
         (e.recurringId ? '<span class="recurring-badge" title="固定支出自動產生">固定</span>' : '')+
         '<input type="date" value="'+esc(e.date)+'" onchange="App.updateEntryDate(\''+mk+'\',\''+e.id+'\',this.value)">'+
         '<input type="text" list="cat-list" class="cat-input" placeholder="分類" value="'+esc(e.category)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'category\',this.value)">'+
         '<input type="text" class="desc" placeholder="說明" value="'+esc(e.description)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'description\',this.value)">'+
         '<button class="icon-btn" title="刪除" onclick="App.deleteEntry(\''+mk+'\',\''+e.id+'\')">✕</button>'+
       '</div>'+
-      '<div class="entry-mid">'+
+      '<div class="entry-pay-row'+(flow==='expense'?' pay-highlight':' pay-highlight-income')+'">'+
         '<button type="button" class="flow-pill '+flow+'" title="點一下切換收入/支出" onclick="App.toggleFlow(\''+mk+'\',\''+e.id+'\')">'+(flow==='income'?'收入':'支出')+'</button>'+
         '<select class="pay-method" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethod\',this.value)">'+
           ['現金','刷卡','電子支付','轉帳'].map(p=>'<option '+(p===payMethod?'selected':'')+'>'+p+'</option>').join('')+
         '</select>'+
         (payMethod!=='現金' ? '<input type="text" class="pay-detail" placeholder="'+(payMethod==='刷卡'?'卡片名稱':'支付方式名稱')+'" value="'+esc(e.payMethodDetail||'')+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethodDetail\',this.value)">' : '')+
-      '</div>'+
-      '<div class="entry-pay-row'+(flow==='expense'?' pay-highlight':'')+'">'+
-        '<span class="pay-label">'+esc(payLabel)+'</span>'+
         '<div class="entry-pay-right">'+
           '<input type="number" class="amount-input mono '+(flow==='income'?'is-income':'')+'" value="'+e.amount+'" placeholder="金額" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'amount\',this.value)">'+
           (e.image ? '<img class="receipt-thumb" src="'+e.image+'" onclick="App.openLightbox(\''+mk+'\',\''+e.id+'\')">' :
@@ -870,7 +896,7 @@ const App = (function(){
   }
 
   return {
-    init, toggleMonth, openSettingsMenu, closeModal,
+    init, toggleMonth, toggleEntryCollapse, openSettingsMenu, closeModal,
     openBudgetModal, addBudgetRow, updateBudgetDraft, removeBudgetRow, submitBudgetCategories,
     addEntry, updateEntryField, updateEntryDate, toggleFlow, handleEntryImage, deleteEntry,
     openCardSettingsModal, addCardSettingRow, updateCardSettingDraft, removeCardSettingRow, submitCardSettings,
