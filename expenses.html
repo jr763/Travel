@@ -255,6 +255,7 @@
 const App = (function(){
   const state = { budget: 0, budgetCategories: [], cardSettings: [], bankAccounts: [], recurringTemplates: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, entryCollapse: {}, modal: null, showStats: false };
 
+  const CATEGORY_LIST = ['薪水','房租','房屋補助','健身房','手機費','訂閱','油費','分期','儲蓄','餐費','水電','交通','購物','娛樂','醫療','其他'];
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
   function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -346,6 +347,11 @@ const App = (function(){
     state.bankAccounts = (await load('bank-accounts')) || [];
     state.recurringTemplates = (await load('recurring-templates')) || [];
     state.monthsIndex = (await load('months-index')) || [];
+    const validMonthsIndex = state.monthsIndex.filter(mk => /^\d{4}-\d{2}$/.test(mk));
+    if(validMonthsIndex.length !== state.monthsIndex.length){
+      state.monthsIndex = validMonthsIndex;
+      await save('months-index', state.monthsIndex);
+    }
     const cur = currentMonthKey();
     if(state.monthsIndex.indexOf(cur) === -1){
       state.monthsIndex.push(cur);
@@ -590,6 +596,11 @@ const App = (function(){
     const arr = state.entriesByMonth[mk];
     const idx = arr.findIndex(e=>e.id===entryId);
     if(idx<0) return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(newDate)){
+      toast('日期格式不正確，已還原');
+      render();
+      return;
+    }
     const entry = arr[idx];
     entry.date = newDate;
     const newMk = newDate.slice(0,7);
@@ -793,18 +804,22 @@ const App = (function(){
       .forEach(el => el.setAttribute('autocomplete','off'));
   }
 
-  function renderPayDetailField(mk, e, payMethod){
+  function renderPayDetailOptions(payMethod, curValue, onchangeAttr, extraClass){
     const isTransfer = payMethod==='轉帳';
     const options = (isTransfer ? (state.bankAccounts||[]).map(a=>a.name) : (state.cardSettings||[]).map(c=>c.name)).filter(Boolean);
+    const cls = extraClass || 'pay-detail';
     if(!options.length){
-      return '<input type="text" autocomplete="off" class="pay-detail" placeholder="'+(isTransfer?'銀行帳戶名稱':(payMethod==='刷卡'?'卡片名稱':'支付方式名稱'))+'" value="'+esc(e.payMethodDetail||'')+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethodDetail\',this.value)">';
+      return '<input type="text" autocomplete="off" class="'+cls+'" placeholder="'+(isTransfer?'銀行帳戶名稱':(payMethod==='刷卡'?'卡片名稱':'支付方式名稱'))+'" value="'+esc(curValue)+'" onchange="'+onchangeAttr+'">';
     }
-    const cur = e.payMethodDetail||'';
-    const allOptions = (!cur || options.includes(cur)) ? options : [cur, ...options];
-    return '<select class="pay-detail" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'payMethodDetail\',this.value)">'+
-      '<option value=""'+(cur?'':' selected')+'>'+(isTransfer?'選擇帳戶':'選擇卡片')+'</option>'+
-      allOptions.map(n=>'<option '+(n===cur?'selected':'')+'>'+esc(n)+'</option>').join('')+
+    const allOptions = (!curValue || options.includes(curValue)) ? options : [curValue, ...options];
+    return '<select class="'+cls+'" onchange="'+onchangeAttr+'">'+
+      '<option value=""'+(curValue?'':' selected')+'>'+(isTransfer?'選擇帳戶':'選擇卡片')+'</option>'+
+      allOptions.map(n=>'<option '+(n===curValue?'selected':'')+'>'+esc(n)+'</option>').join('')+
     '</select>';
+  }
+  function renderPayDetailField(mk, e, payMethod){
+    return renderPayDetailOptions(payMethod, e.payMethodDetail||'',
+      "App.updateEntryField('"+mk+"','"+e.id+"','payMethodDetail',this.value)");
   }
 
   function renderEntry(mk, e){
@@ -937,7 +952,11 @@ const App = (function(){
             '</div>'+
             '<div class="recurring-row-line">'+
               '<div class="recurring-field"><label>名稱</label><input type="text" placeholder="例：房租" value="'+esc(t.name)+'" onchange="App.updateRecurringDraft('+i+',\'name\',this.value)"></div>'+
-              '<div class="recurring-field"><label>分類（可自行輸入）</label><input type="text" list="cat-list" placeholder="例：居住／訂閱／交通" value="'+esc(t.category)+'" onchange="App.updateRecurringDraft('+i+',\'category\',this.value)"></div>'+
+              '<div class="recurring-field"><label>分類</label><select onchange="App.updateRecurringDraft('+i+',\'category\',this.value)">'+
+                '<option value=""'+(t.category?'':' selected')+'>請選擇</option>'+
+                (t.category && !CATEGORY_LIST.includes(t.category) ? '<option selected>'+esc(t.category)+'</option>' : '')+
+                CATEGORY_LIST.map(c=>'<option '+(c===t.category?'selected':'')+'>'+c+'</option>').join('')+
+              '</select></div>'+
             '</div>'+
             '<div class="recurring-row-line">'+
               '<div class="recurring-field"><label>每月金額</label><input type="number" class="mono" placeholder="0" value="'+t.amount+'" onchange="App.updateRecurringDraft('+i+',\'amount\',this.value)"></div>'+
@@ -947,7 +966,9 @@ const App = (function(){
               '<div class="recurring-field"><label>支付方式</label><select onchange="App.updateRecurringDraft('+i+',\'payMethod\',this.value)">'+
                 ['現金','刷卡','電子支付','轉帳'].map(p=>'<option '+(p===t.payMethod?'selected':'')+'>'+p+'</option>').join('')+
               '</select></div>'+
-              (t.payMethod!=='現金' ? '<div class="recurring-field"><label>卡片／支付方式名稱</label><input type="text" placeholder="例：國泰現金回饋卡" value="'+esc(t.payMethodDetail||'')+'" onchange="App.updateRecurringDraft('+i+',\'payMethodDetail\',this.value)"></div>' : '')+
+              (t.payMethod!=='現金' ? '<div class="recurring-field"><label>卡片／帳戶名稱</label>'+
+                renderPayDetailOptions(t.payMethod, t.payMethodDetail||'', "App.updateRecurringDraft("+i+",'payMethodDetail',this.value)")+
+              '</div>' : '')+
             '</div>'+
             '<div class="recurring-row-line">'+
               '<div class="recurring-field"><label>開始月份</label><input type="month" value="'+esc(t.startMonth||'')+'" onchange="App.updateRecurringDraft('+i+',\'startMonth\',this.value)"></div>'+
