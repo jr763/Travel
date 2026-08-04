@@ -194,6 +194,7 @@
   .budget-total{margin-top:14px;padding-top:14px;border-top:1.5px dashed var(--line);display:flex;justify-content:space-between;
     font-family:'IBM Plex Mono',monospace;font-size:14.5px;font-weight:600;}
   .diff-pos{color:var(--clay);} .diff-neg{color:var(--teal);}
+  .settle-hint{margin-top:10px;font-size:12px;color:var(--text-soft);}
 
   /* Day divider */
   .day-block{margin-bottom:4px;}
@@ -976,6 +977,16 @@ const App = (function(){
 
     const est = trip.totalEst||0, act = trip.totalAct||0, diff = act-est;
 
+    // Settle-up: how much each person (蒨/浚) has paid, and who owes whom to balance out.
+    const paidA = items.filter(i=>i.payer==='蒨').reduce((s,i)=>s+(Number(i.actualCost)||0),0) +
+      expenses.filter(e=>e.payer==='蒨').reduce((s,e)=>s+(Number(e.actualCost)||0),0);
+    const paidB = items.filter(i=>i.payer==='浚').reduce((s,i)=>s+(Number(i.actualCost)||0),0) +
+      expenses.filter(e=>e.payer==='浚').reduce((s,e)=>s+(Number(e.actualCost)||0),0);
+    const untracked = items.filter(i=>!i.payer).reduce((s,i)=>s+(Number(i.actualCost)||0),0) +
+      expenses.filter(e=>!e.payer).reduce((s,e)=>s+(Number(e.actualCost)||0),0);
+    const trackedTotal = paidA + paidB;
+    const settleDiff = paidA - trackedTotal/2; // >0: 浚 owes 蒨; <0: 蒨 owes 浚
+
     return '<div class="back-row"><span class="back-link" onclick="App.goHome()">← 回到行程列表</span>'+
         '<div class="actions-row"><button class="btn btn-outline btn-sm" onclick="App.openEditTripModal()">編輯行程資訊</button>'+
         '<button class="btn '+(editing?'btn-amber':'btn-outline')+' btn-sm" onclick="App.toggleEditMode()">'+(editing?'✓ 完成編輯':'✎ 編輯景點／開銷')+'</button></div>'+
@@ -1001,6 +1012,16 @@ const App = (function(){
           (diff>0?'超支 +':'結餘 ')+'$'+fmt(Math.abs(diff))+'</span></div>'+
       '</div>'+
 
+      (trackedTotal>0 ? '<div class="section">'+
+        '<div class="section-head"><h3>分帳結算</h3></div>'+
+        '<div class="budget-bars">'+settleBar(paidA, paidB)+'</div>'+
+        '<div class="budget-total"><span>結算</span><span class="'+(settleDiff===0?'diff-neg':(settleDiff>0?'diff-pos':'diff-pos'))+'">'+
+          (settleDiff===0 ? '已經打平，不用轉帳' :
+            (settleDiff>0 ? '浚 要轉 $'+fmt(Math.abs(settleDiff))+' 給 蒨' : '蒨 要轉 $'+fmt(Math.abs(settleDiff))+' 給 浚'))+
+        '</span></div>'+
+        (untracked>0 ? '<div class="settle-hint">還有 $'+fmt(untracked)+' 的實際花費沒有標付款者，沒算進這次結算裡。</div>' : '')+
+      '</div>' : '')+
+
       '<div class="section">'+
         '<div class="section-head"><h3>行程景點</h3><div class="actions-row">'+
           (dayNums.length>1 ? '<button class="btn btn-outline btn-sm" onclick="App.setAllDaysCollapsed(false)">全部展開</button>'+
@@ -1023,6 +1044,12 @@ const App = (function(){
     const max = Math.max(est, act, 1);
     return '<div class="budget-row"><span class="label">預估</span><div class="bar-track"><div class="bar-fill est" style="width:'+(est/max*100)+'%"></div></div><span class="val mono">$'+fmt(est)+'</span></div>'+
       '<div class="budget-row"><span class="label">實際</span><div class="bar-track"><div class="bar-fill act" style="width:'+(act/max*100)+'%"></div></div><span class="val mono">$'+fmt(act)+'</span></div>';
+  }
+
+  function settleBar(paidA, paidB){
+    const max = Math.max(paidA, paidB, 1);
+    return '<div class="budget-row"><span class="label">蒨</span><div class="bar-track"><div class="bar-fill est" style="width:'+(paidA/max*100)+'%"></div></div><span class="val mono">$'+fmt(paidA)+'</span></div>'+
+      '<div class="budget-row"><span class="label">浚</span><div class="bar-track"><div class="bar-fill act" style="width:'+(paidB/max*100)+'%"></div></div><span class="val mono">$'+fmt(paidB)+'</span></div>';
   }
 
   function renderStop(item, editing){
