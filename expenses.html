@@ -6,6 +6,7 @@
 <title>日常帳</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Iansui&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
 <script type="module">
   // ====================================================================
   // 雲端同步設定（選填，跟行程網站是同一個 Firebase 專案也沒關係，
@@ -127,6 +128,8 @@
   .empty-hint{color:var(--text-soft);font-size:13px;background:var(--paper-tint);border-radius:var(--radius-md);padding:16px;text-align:center;}
 
   .entry-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:12px 14px;margin-top:10px;}
+  .entry-row.is-recurring{border-left:3px solid var(--sky);}
+  .recurring-badge{font-size:13px;flex:none;}
   .entry-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .entry-top input[type=date]{width:132px;font-size:12.5px;padding:7px 8px;}
   .entry-top .cat-input{width:96px;font-size:12.5px;padding:7px 8px;}
@@ -150,6 +153,12 @@
     justify-content:center;cursor:pointer;color:var(--text-soft);font-size:16px;background:var(--paper);flex:none;}
   .receipt-add:hover{border-color:var(--amber-deep);color:var(--amber-deep);}
 
+  .btn-ghost.is-active{background:var(--amber);color:var(--ink);border-color:var(--amber);}
+  .section-card{background:var(--paper);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow-card);}
+  .section-card-head{font-family:'Iansui',cursive;font-weight:400;font-size:15px;color:var(--ink);margin-bottom:10px;}
+  .chart-box{position:relative;height:220px;}
+  .chart-box-pie{height:220px;max-width:280px;margin:0 auto;}
+
   .card-summary{background:var(--paper);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px;box-shadow:var(--shadow-card);}
   .card-summary-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;}
   .card-summary-head{font-size:12px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;}
@@ -159,6 +168,14 @@
   .card-setting-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
   .card-setting-row input[type=text]{flex:1;}
   .card-setting-row input[type=number]{width:70px;}
+
+  .modal-wide{max-width:520px;}
+  .recurring-row{background:var(--paper-tint);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:10px;}
+  .recurring-row-line{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  .recurring-row-line:last-child{margin-bottom:0;}
+  .recurring-row-line input,.recurring-row-line select{flex:1;min-width:80px;font-size:12.5px;padding:7px 8px;}
+  .recurring-mini-label{flex:1;min-width:140px;font-size:10.5px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.03em;}
+  .recurring-mini-label input{width:100%;margin-top:4px;font-size:12.5px;padding:7px 8px;}
 
   .overlay{position:fixed;inset:0;background:rgba(58,50,41,.55);backdrop-filter:blur(2px);display:flex;align-items:center;
     justify-content:center;padding:20px;z-index:50;}
@@ -205,7 +222,7 @@
 
 <script>
 const App = (function(){
-  const state = { budget: 0, cardSettings: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null };
+  const state = { budget: 0, cardSettings: [], recurringTemplates: [], monthsIndex: [], entriesByMonth: {}, expandedMonths: {}, modal: null, showStats: false };
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmt(n){ n = Number(n)||0; return n.toLocaleString('zh-Hant-TW'); }
@@ -294,6 +311,7 @@ const App = (function(){
   async function init(){
     state.budget = (await load('budget')) || 0;
     state.cardSettings = (await load('card-settings')) || [];
+    state.recurringTemplates = (await load('recurring-templates')) || [];
     state.monthsIndex = (await load('months-index')) || [];
     const cur = currentMonthKey();
     if(state.monthsIndex.indexOf(cur) === -1){
@@ -307,6 +325,36 @@ const App = (function(){
     await loadMonthEntries(cur);
     await loadMonthEntries(shiftMonthKey(cur, -1));
     await loadMonthEntries(shiftMonthKey(cur, 1));
+    await applyRecurringForMonth(cur);
+    render();
+  }
+  async function applyRecurringForMonth(mk){
+    await loadMonthEntries(mk);
+    const arr = state.entriesByMonth[mk];
+    let added = 0;
+    (state.recurringTemplates||[]).forEach(t => {
+      const active = (!t.startMonth || t.startMonth<=mk) && (!t.endMonth || mk<=t.endMonth);
+      if(!active) return;
+      if(arr.some(e=>e.recurringId===t.id)) return;
+      const day = Math.min(28, Math.max(1, Number(t.dayOfMonth)||1));
+      arr.push({ id: uid(), date: mk+'-'+String(day).padStart(2,'0'), category: t.category||'其他',
+        description: t.name||'', amount: Number(t.amount)||0, flow:'expense',
+        payMethod: t.payMethod||'現金', payMethodDetail: t.payMethodDetail||'', payer: t.payer||'',
+        image:null, recurringId: t.id });
+      added++;
+    });
+    if(added>0){
+      await save('entries-'+mk, arr);
+      if(state.monthsIndex.indexOf(mk)===-1){
+        state.monthsIndex.push(mk); state.monthsIndex.sort().reverse();
+        await save('months-index', state.monthsIndex);
+      }
+    }
+    return added;
+  }
+  async function applyRecurringForMonthUI(mk){
+    const added = await applyRecurringForMonth(mk);
+    toast(added>0 ? '已套用 '+added+' 筆固定支出' : '這個月的固定支出已經套用過了');
     render();
   }
   function allLoadedEntries(){
@@ -335,6 +383,43 @@ const App = (function(){
     render();
   }
 
+  // ---------- Stats (trend line + fixed/variable pie) ----------
+  async function toggleStats(){
+    state.showStats = !state.showStats;
+    if(state.showStats){
+      for(const mk of state.monthsIndex){ await loadMonthEntries(mk); }
+    }
+    render();
+  }
+  let trendChartInstance = null, pieChartInstance = null;
+  function renderCharts(){
+    if(typeof Chart === 'undefined') return;
+    const trendCanvas = document.getElementById('trend-chart');
+    if(trendCanvas){
+      if(trendChartInstance) trendChartInstance.destroy();
+      const months = state.monthsIndex.slice().sort();
+      const last = months.slice(-12);
+      const labels = last.map(mk => Number(mk.split('-')[1])+'月');
+      const data = last.map(mk => (state.entriesByMonth[mk]||[]).filter(e=>(e.flow||'expense')!=='income').reduce((s,e)=>s+(Number(e.amount)||0),0));
+      const datasets = [{ label:'支出', data, borderColor:'#C99A2E', backgroundColor:'rgba(232,184,75,.18)', fill:true, tension:.3, pointRadius:3 }];
+      if(state.budget>0) datasets.push({ label:'預算', data:last.map(()=>state.budget), borderColor:'#D98A93', borderDash:[6,4], pointRadius:0, fill:false });
+      trendChartInstance = new Chart(trendCanvas, { type:'line', data:{ labels, datasets },
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ labels:{ color:'#3D3327', font:{ family:'Inter' } } } },
+          scales:{ x:{ ticks:{ color:'#93876E' }, grid:{ color:'#E1D3B6' } }, y:{ ticks:{ color:'#93876E' }, grid:{ color:'#E1D3B6' }, beginAtZero:true } } } });
+    }
+    const pieCanvas = document.getElementById('pie-chart');
+    if(pieCanvas){
+      if(pieChartInstance) pieChartInstance.destroy();
+      const entries = state.entriesByMonth[currentMonthKey()]||[];
+      const fixedSum = entries.filter(e=>(e.flow||'expense')!=='income' && e.recurringId).reduce((s,e)=>s+(Number(e.amount)||0),0);
+      const varSum = entries.filter(e=>(e.flow||'expense')!=='income' && !e.recurringId).reduce((s,e)=>s+(Number(e.amount)||0),0);
+      pieChartInstance = new Chart(pieCanvas, { type:'pie',
+        data:{ labels:['固定支出 $'+fmt(fixedSum), '變動支出 $'+fmt(varSum)], datasets:[{ data:[fixedSum,varSum], backgroundColor:['#9DBAD1','#E8B84B'] }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color:'#3D3327', font:{ family:'Inter' } } } } } });
+    }
+  }
+
   // ---------- Budget ----------
   function openBudgetModal(){ state.modal = {type:'budget'}; render(); }
   async function submitBudget(){
@@ -360,6 +445,33 @@ const App = (function(){
     state.modal = null;
     render();
   }
+
+  // ---------- Recurring (fixed) expense templates ----------
+  function openRecurringModal(){
+    state.modal = { type:'recurring', draft: (state.recurringTemplates||[]).map(t=>({...t})) };
+    render();
+  }
+  function addRecurringRow(){
+    state.modal.draft.push({ id: uid(), name:'', category:'其他', amount:0, dayOfMonth:1,
+      payMethod:'現金', payMethodDetail:'', payer:'', startMonth: currentMonthKey(), endMonth:'' });
+    render();
+  }
+  function updateRecurringDraft(idx, field, value){
+    if(field==='amount' || field==='dayOfMonth') value = Number(value)||0;
+    state.modal.draft[idx][field] = value;
+    if(field==='payMethod') render();
+  }
+  function removeRecurringRow(idx){ state.modal.draft.splice(idx,1); render(); }
+  async function submitRecurring(){
+    const draft = state.modal.draft.filter(t => t.name && t.name.trim());
+    state.recurringTemplates = draft;
+    await save('recurring-templates', draft);
+    state.modal = null;
+    render();
+    const added = await applyRecurringForMonth(currentMonthKey());
+    if(added>0){ toast('已套用 '+added+' 筆固定支出到本月'); render(); }
+  }
+
   // ---------- Entries ----------
   async function addEntry(){
     const mk = currentMonthKey();
@@ -473,6 +585,8 @@ const App = (function(){
     const syncCode = getSyncCode();
     document.getElementById('topbar-actions').innerHTML =
       '<button class="btn btn-ghost" onclick="App.openSyncModal()">'+(syncCode?'☁ 已同步':'☁ 雲端同步')+'</button>'+
+      '<button class="btn btn-ghost'+(state.showStats?' is-active':'')+'" onclick="App.toggleStats()">📊 統計</button>'+
+      '<button class="btn btn-ghost" onclick="App.openRecurringModal()">🔁 固定支出</button>'+
       '<button class="btn btn-ghost" onclick="App.openBudgetModal()">⚙ 設定預算</button>'+
       '<button class="btn btn-amber" onclick="App.addEntry()">+ 新增花費</button>';
 
@@ -494,6 +608,15 @@ const App = (function(){
         '<div class="summary-status '+(over?'over':'under')+'">'+(over?'⚠️ 已超出預算 $'+fmt(curExpense-budget):'✓ 還剩 $'+fmt(budget-curExpense))+'</div>'
       ) : '<div class="no-budget-hint">還沒有設定預算，點右上角「設定預算」開始追蹤是否超支。</div>')+
     '</div>';
+
+    if(state.showStats){
+      html += '<div class="section-card">'+
+        '<div class="section-card-head">📊 支出趨勢（近 12 個月'+(budget>0?'，虛線為預算':'')+'）</div>'+
+        '<div class="chart-box"><canvas id="trend-chart"></canvas></div>'+
+        '<div class="section-card-head" style="margin-top:22px;">🥧 '+monthLabel(curMk)+'：固定 vs 變動支出</div>'+
+        '<div class="chart-box chart-box-pie"><canvas id="pie-chart"></canvas></div>'+
+      '</div>';
+    }
 
     // Credit-card breakdown: real billing cycle if a closing day is set for the card, else calendar month.
     const allEntries = allLoadedEntries();
@@ -550,6 +673,7 @@ const App = (function(){
               (budget>0?(mOver?' ⚠️':' ✓'):'')+(incomeTotal>0?' <span style="color:#8FA888;">(+$'+fmt(incomeTotal)+')</span>':'')+'</div>'+
           '</div>'+
           '<div class="month-body'+(expanded?'':' is-collapsed')+'">'+
+            '<button class="btn btn-outline btn-sm" style="margin-bottom:10px;" onclick="App.applyRecurringForMonthUI(\''+mk+'\')">🔁 套用固定支出到這個月</button>'+
             (entries.length ? entries.map(e=>renderEntry(mk,e)).join('') : '<div class="empty-hint">這個月還沒有紀錄。</div>')+
           '</div>'+
         '</div>';
@@ -557,6 +681,7 @@ const App = (function(){
     }
 
     document.getElementById('view').innerHTML = html;
+    if(state.showStats) renderCharts();
     let modalHtml = state.modal ? renderModal() : '';
     if(lightboxCtx) modalHtml += renderLightbox();
     document.getElementById('modal-root').innerHTML = modalHtml;
@@ -565,8 +690,9 @@ const App = (function(){
   function renderEntry(mk, e){
     const flow = e.flow || 'expense';
     const payMethod = e.payMethod || '現金';
-    return '<div class="entry-row">'+
+    return '<div class="entry-row'+(e.recurringId?' is-recurring':'')+'">'+
       '<div class="entry-top">'+
+        (e.recurringId ? '<span class="recurring-badge" title="固定支出自動產生">🔁</span>' : '')+
         '<input type="date" value="'+esc(e.date)+'" onchange="App.updateEntryDate(\''+mk+'\',\''+e.id+'\',this.value)">'+
         '<input type="text" list="cat-list" class="cat-input" placeholder="分類" value="'+esc(e.category)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'category\',this.value)">'+
         '<input type="text" class="desc" placeholder="說明" value="'+esc(e.description)+'" onchange="App.updateEntryField(\''+mk+'\',\''+e.id+'\',\'description\',this.value)">'+
@@ -641,6 +767,36 @@ const App = (function(){
         '<button class="btn btn-amber" onclick="App.submitCardSettings()">儲存</button></div>'+
       '</div></div>';
     }
+    if(m.type==='recurring'){
+      const draft = m.draft || [];
+      return '<div class="overlay" onclick="App.closeModal()"><div class="modal modal-wide" onclick="event.stopPropagation()">'+
+        '<h3>固定支出</h3>'+
+        '<p class="lead">設定每月會自動出現的固定花費（房租、訂閱、分期等）。「結束月份」留空代表沒有期限，會一直套用下去；分期這種有到期的，填結束月份就會自動停止。</p>'+
+        (draft.length ? draft.map((t,i)=>'<div class="recurring-row">'+
+            '<div class="recurring-row-line">'+
+              '<input type="text" placeholder="名稱（例：房租）" value="'+esc(t.name)+'" onchange="App.updateRecurringDraft('+i+',\'name\',this.value)">'+
+              '<input type="text" list="cat-list" placeholder="分類" value="'+esc(t.category)+'" onchange="App.updateRecurringDraft('+i+',\'category\',this.value)">'+
+              '<button class="icon-btn" title="刪除" onclick="App.removeRecurringRow('+i+')">✕</button>'+
+            '</div>'+
+            '<div class="recurring-row-line">'+
+              '<input type="number" class="mono" placeholder="金額" value="'+t.amount+'" onchange="App.updateRecurringDraft('+i+',\'amount\',this.value)">'+
+              '<input type="number" min="1" max="28" placeholder="每月幾號" title="每月幾號扣款" value="'+t.dayOfMonth+'" onchange="App.updateRecurringDraft('+i+',\'dayOfMonth\',this.value)">'+
+              '<select onchange="App.updateRecurringDraft('+i+',\'payMethod\',this.value)">'+
+                ['現金','刷卡','電子支付'].map(p=>'<option '+(p===t.payMethod?'selected':'')+'>'+p+'</option>').join('')+
+              '</select>'+
+            '</div>'+
+            (t.payMethod!=='現金' ? '<div class="recurring-row-line"><input type="text" placeholder="卡片/支付方式名稱" value="'+esc(t.payMethodDetail||'')+'" onchange="App.updateRecurringDraft('+i+',\'payMethodDetail\',this.value)"></div>' : '')+
+            '<div class="recurring-row-line">'+
+              '<label class="recurring-mini-label">開始<input type="month" value="'+esc(t.startMonth||'')+'" onchange="App.updateRecurringDraft('+i+',\'startMonth\',this.value)"></label>'+
+              '<label class="recurring-mini-label">結束（留空＝沒有期限）<input type="month" value="'+esc(t.endMonth||'')+'" onchange="App.updateRecurringDraft('+i+',\'endMonth\',this.value)"></label>'+
+            '</div>'+
+          '</div>'
+        ).join('') : '<div class="template-box">還沒有固定支出，點下面「+ 新增固定支出」開始設定。</div>')+
+        '<button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="App.addRecurringRow()">+ 新增固定支出</button>'+
+        '<div class="actions-row"><button class="btn btn-outline" onclick="App.closeModal()">取消</button>'+
+        '<button class="btn btn-amber" onclick="App.submitRecurring()">儲存並套用到本月</button></div>'+
+      '</div></div>';
+    }
     return '';
   }
 
@@ -648,6 +804,7 @@ const App = (function(){
     init, toggleMonth, openBudgetModal, submitBudget, closeModal,
     addEntry, updateEntryField, updateEntryDate, cyclePayer, toggleFlow, handleEntryImage, deleteEntry,
     openCardSettingsModal, addCardSettingRow, updateCardSettingDraft, removeCardSettingRow, submitCardSettings,
+    openRecurringModal, addRecurringRow, updateRecurringDraft, removeRecurringRow, submitRecurring, applyRecurringForMonthUI, toggleStats,
     openLightbox, closeLightbox, deleteLightboxImage,
     openSyncModal, submitSyncCode
   };
