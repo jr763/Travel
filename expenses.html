@@ -655,11 +655,16 @@ const App = (function(){
   function openSyncModal(){ state.modal = {type:'sync'}; render(); }
   async function submitSyncCode(){
     const val = document.getElementById('f-sync-code').value.trim();
+    const oldCode = getSyncCode();
+    const isNewCode = val !== oldCode;
     const hadLocalData = state.monthsIndex && state.monthsIndex.length > 0;
     setSyncCodeLocal(val);
     state.modal = null;
     render();
-    if(val && window.__cloudReady && hadLocalData){
+    // Only push local data up when actually switching to a different code — re-saving the
+    // same code must never re-upload a possibly-stale local snapshot over newer cloud data
+    // that another device may have written since.
+    if(val && isNewCode && window.__cloudReady && hadLocalData){
       toast('正在把本機資料同步到雲端...');
       await migrateLocalToCloud(val);
     }
